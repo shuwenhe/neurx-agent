@@ -1,65 +1,65 @@
 # NeurX AgentOS
 
-> 基于 **Qt 6** 的跨平台 Agent 操作系统
-> 支持 Windows · macOS · Linux · iOS · Android · HarmonyOS
+> A cross-platform **Agent Operating System** built with **Qt 6**
+> Supports Windows · macOS · Linux · iOS · Android · HarmonyOS
 
 ---
 
-## 架构总览
+## Architecture
 
 ```
 neurx/
-├── CMakeLists.txt          # 顶层构建入口 (Qt6 + CMake)
-├── core/                   # 核心框架（纯 C++20，无 UI 依赖）
-│   ├── agent/              # Agent 基类、注册表、消息、Runner
-│   ├── runtime/            # AgentRuntime、TaskScheduler、EventBus
-│   ├── tools/              # BaseTool、ToolRegistry
-│   ├── llm/                # LlmClient（OpenAI-compatible streaming）
-│   ├── memory/             # MemoryStore（SQLite KV + 全文搜索）
-│   └── log/                # Logger（文件 + 信号）
-├── plugins/                # 内建与可动态加载的插件
+├── CMakeLists.txt          # Top-level build entry (Qt6 + CMake)
+├── core/                   # Core framework (pure C++20, no UI dependency)
+│   ├── agent/              # Agent base class, registry, messages, runner
+│   ├── runtime/            # AgentRuntime, TaskScheduler, EventBus
+│   ├── tools/              # BaseTool, ToolRegistry
+│   ├── llm/                # LlmClient (OpenAI-compatible streaming)
+│   ├── memory/             # MemoryStore (SQLite KV + full-text search)
+│   └── log/                # Logger (file + Qt signal)
+├── plugins/                # Built-in and dynamically loadable plugins
 │   └── builtin/            # WebSearch / FileSystem / Shell / Http / ReActAgent
-├── app/                    # Qt Quick 应用入口 + QML UI
+├── app/                    # Qt Quick application entry + QML UI
 │   ├── main.cpp
-│   ├── bridge/             # C++↔QML 桥接（RuntimeBridge、AgentListModel、LogModel）
+│   ├── bridge/             # C++↔QML bridges (RuntimeBridge, AgentListModel, LogModel)
 │   └── qml/
-│       ├── Main.qml        # 窗口根节点
-│       ├── AppShell.qml    # 侧边导航 + 页面栈
-│       ├── components/     # AgentCard、ChatBubble、SideNav、StatusDot
-│       └── pages/          # Dashboard、Agents、Chat、Tools、Settings
-└── platform/               # 各平台专属配置
-    ├── android/            # AndroidManifest + CMake 配置
-    ├── ios/                # Info.plist + CMake 配置
-    └── harmony/            # OHOS toolchain 说明 + CMake 配置
+│       ├── Main.qml        # Window root
+│       ├── AppShell.qml    # Side navigation + page stack
+│       ├── components/     # AgentCard, ChatBubble, SideNav, StatusDot
+│       └── pages/          # Dashboard, Agents, Chat, Tools, Settings
+└── platform/               # Platform-specific configuration
+    ├── android/            # AndroidManifest + CMake config
+    ├── ios/                # Info.plist + CMake config
+    └── harmony/            # OHOS toolchain notes + CMake config
 ```
 
 ---
 
-## 核心概念
+## Core Concepts
 
-| 概念 | 说明 |
-|------|------|
-| **Agent** | 独立运行的智能体，可接收消息、调用 LLM、使用 Tool |
-| **AgentRegistry** | 全局代理注册表，负责创建、销毁和消息路由 |
-| **AgentRuntime** | 顶层运行时，统一启动/关闭所有子系统 |
-| **TaskScheduler** | 优先级任务队列，通过 `QtConcurrent` 异步执行 |
-| **EventBus** | 发布/订阅事件总线，解耦各模块 |
-| **LlmClient** | OpenAI-compatible REST 客户端（支持流式输出） |
-| **ToolRegistry** | 工具注册表，自动生成 JSON Schema 供 LLM function-calling 使用 |
-| **MemoryStore** | SQLite 持久化键值存储 + 全文搜索 |
-| **ReActAgent** | 内建 ReAct 范式代理（Reason → Act → Observe 循环） |
+| Concept | Description |
+|---------|-------------|
+| **Agent** | An autonomous entity that receives messages, calls LLMs, and uses tools |
+| **AgentRegistry** | Global agent registry — handles creation, destruction, and message routing |
+| **AgentRuntime** | Top-level runtime that starts and shuts down all subsystems |
+| **TaskScheduler** | Priority task queue with async execution via `QtConcurrent` |
+| **EventBus** | Publish/subscribe event bus for decoupled inter-module communication |
+| **LlmClient** | OpenAI-compatible REST client with streaming support |
+| **ToolRegistry** | Tool registry that auto-generates JSON Schema for LLM function-calling |
+| **MemoryStore** | SQLite-backed persistent key-value store with full-text search |
+| **ReActAgent** | Built-in ReAct agent (Reason → Act → Observe loop) |
 
 ---
 
-## 快速开始
+## Getting Started
 
-### 依赖
+### Requirements
 
-- Qt 6.5+ （含 Quick / QuickControls2 / Network / WebSockets / Sql / Concurrent）
+- Qt 6.5+ (Quick / QuickControls2 / Network / WebSockets / Sql / Concurrent)
 - CMake 3.21+
-- C++20 编译器（GCC 12 / Clang 15 / MSVC 2022）
+- C++20 compiler (GCC 12 / Clang 15 / MSVC 2022)
 
-### 桌面构建（macOS / Linux / Windows）
+### Desktop (macOS / Linux / Windows)
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -80,8 +80,7 @@ cmake --build build-android --target package
 
 ### iOS
 
-在 Xcode 中通过 Qt Creator 或 `cmake -G Xcode` 打开后，
-选择 iOS 目标直接编译。
+Open the project via Qt Creator or `cmake -G Xcode`, then select the iOS target and build.
 
 ### HarmonyOS (OHOS)
 
@@ -95,9 +94,9 @@ cmake --build build-harmony
 
 ---
 
-## 扩展 Agent / Tool
+## Extending Agents & Tools
 
-### 自定义 Agent
+### Custom Agent
 
 ```cpp
 #include "core/agent/Agent.h"
@@ -107,15 +106,15 @@ class MyAgent : public neurx::Agent {
 public:
     MyAgent() : Agent("MyAgent") {}
     void receiveMessage(const QVariantMap &msg) override {
-        // 处理消息，调用 LLM，使用 Tool …
+        // Handle message, call LLM, invoke tools …
     }
 };
 
-// 注册
+// Register
 neurx::AgentRegistry::instance().registerAgent(new MyAgent);
 ```
 
-### 自定义 Tool
+### Custom Tool
 
 ```cpp
 #include "core/tools/BaseTool.h"
@@ -134,6 +133,6 @@ neurx::ToolRegistry::instance().registerTool(new MyTool);
 
 ---
 
-## 许可证
+## License
 
 MIT
