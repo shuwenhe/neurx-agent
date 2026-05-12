@@ -1,0 +1,55 @@
+# Qt/CMake build artifacts
+build/
+out/
+.cache/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.user
+*.user.*
+
+# Qt Creator
+*.pro.user
+*.qbs.user
+
+# Generated QML type info
+*.qmltypes
+
+# macOS
+.DS_Store
+*.dSYM/
+
+# Windows
+Thumbs.db
+*.pdb
+
+# Android
+android/build/
+android/gradle/
+local.properties
+*.apk
+*.aab
+
+# iOS
+ios/build/
+*.xcuserstate
+DerivedData/
+
+# Compiled object files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+
+# Python (tooling)
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
