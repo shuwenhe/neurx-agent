@@ -33,8 +33,8 @@ void ReActAgent::receiveMessage(const QVariantMap &message)
     if (query.isEmpty()) return;
 
     m_history.clear();
-    m_history.append({.role="system", .content=SYSTEM_PROMPT});
-    m_history.append({.role="user",   .content=query});
+    m_history.append(LlmMessage{QStringLiteral("system"), QString::fromUtf8(SYSTEM_PROMPT)});
+    m_history.append(LlmMessage{QStringLiteral("user"), query});
 
     runReActLoop(query);
 }
@@ -71,11 +71,12 @@ void ReActAgent::handleLlmResponse(const QString &content,
         }
 
         // Feed observation back
-        m_history.append({.role="assistant", .content=content});
-        m_history.append({.role="tool",
-                          .content=QString::fromUtf8(
-                              QJsonDocument::fromVariant(toolResult)
-                                  .toJson(QJsonDocument::Compact))});
+        m_history.append(LlmMessage{QStringLiteral("assistant"), content});
+        m_history.append(LlmMessage{
+            QStringLiteral("tool"),
+            QString::fromUtf8(QJsonDocument::fromVariant(toolResult)
+                                  .toJson(QJsonDocument::Compact))
+        });
 
         // Continue loop
         if (m_history.size() < m_maxIterations * 2 + 2) {
@@ -87,7 +88,7 @@ void ReActAgent::handleLlmResponse(const QString &content,
         }
     } else {
         // Final answer
-        m_history.append({.role="assistant", .content=content});
+        m_history.append(LlmMessage{QStringLiteral("assistant"), content});
         emit messageSent("", {{"role","assistant"}, {"content", content}});
         setStatus(Status::Idle);
     }
