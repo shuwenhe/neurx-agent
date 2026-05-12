@@ -17,11 +17,8 @@ target_sources(neurx_core PRIVATE
     tools/BaseTool.cpp
     # LLM connector
     llm/LlmClient.cpp
-    llm/LlmRequest.cpp
-    llm/LlmResponse.cpp
     # Memory
     memory/MemoryStore.cpp
-    memory/VectorIndex.cpp
     # Logging
     log/Logger.cpp
 )
@@ -34,7 +31,10 @@ target_link_libraries(neurx_core
     PUBLIC
         Qt6::Core
         Qt6::Network
-        Qt6::WebSockets
         Qt6::Concurrent
         Qt6::Sql
 )
+if(Qt6WebSockets_FOUND)
+    target_link_libraries(neurx_core PUBLIC Qt6::WebSockets)
+    target_compile_definitions(neurx_core PUBLIC NEURX_WEBSOCKETS_ENABLED)
+endif()

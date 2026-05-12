@@ -12,10 +12,6 @@ Window {
     title: qsTr("NeurX AgentOS")
     color: "#0d0d0d"
 
-    // Load custom fonts
-    FontLoader { source: "qrc:/neurx/resources/fonts/Inter-Regular.ttf" }
-    FontLoader { source: "qrc:/neurx/resources/fonts/Inter-Bold.ttf"    }
-
     AppShell {
         anchors.fill: parent
     }

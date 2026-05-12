@@ -81,13 +81,14 @@ Item {
             border.color: page.palette.border
             radius: 6
 
-            TextInput {
+            TextField {
                 anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                 verticalAlignment: TextInput.AlignVCenter
                 font { family: "Inter"; pixelSize: 14 }
                 color: page.palette.textPrim
                 placeholderText: parent.parent.placeholder
                 echoMode: parent.parent.echoMode
+                background: null
                 clip: true
             }
         }

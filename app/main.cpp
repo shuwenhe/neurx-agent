@@ -2,7 +2,6 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
-#include <QIcon>
 
 #include "runtime/AgentRuntime.h"
 #include "bridge/RuntimeBridge.h"
@@ -19,7 +18,6 @@ int main(int argc, char *argv[])
         .arg(NEURX_VERSION_PATCH));
     app.setOrganizationName("NeurX");
     app.setOrganizationDomain("io.neurx");
-    app.setWindowIcon(QIcon(":/neurx/resources/icons/neurx.png"));
 
     QQuickStyle::setStyle("Basic");
 
@@ -34,10 +32,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("AgentModel", agentModel);
     engine.rootContext()->setContextProperty("LogModel",   logModel);
 
-    const QUrl url(u"qrc:/neurx/qml/Main.qml"_qs);
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
         &app, []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
-    engine.load(url);
+    engine.loadFromModule("neurx", "Main");
 
     runtime.start();
 

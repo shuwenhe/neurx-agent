@@ -5,6 +5,7 @@
 #include <QNetworkReply>
 #include <QEventLoop>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>

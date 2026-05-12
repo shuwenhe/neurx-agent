@@ -1,5 +1,5 @@
 #include "LogModel.h"
-#include "../log/Logger.h"
+#include "log/Logger.h"
 
 namespace neurx {
 

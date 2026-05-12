@@ -38,11 +38,13 @@ Rectangle {
 
         // Nav items
         Repeater {
-            model: nav.pages
+            model: nav.pages.length
             delegate: NavItem {
+                required property int index
+                readonly property var page: nav.pages[index]
                 Layout.fillWidth: true
-                icon:    modelData.icon
-                label:   modelData.label
+                icon:    page.icon
+                label:   page.label
                 active:  index === nav.currentIndex
                 onClicked: nav.pageRequested(index)
             }

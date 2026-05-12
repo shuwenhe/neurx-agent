@@ -23,10 +23,16 @@ find_package(Qt6 REQUIRED COMPONENTS
     QuickControls2
     Network
     Concurrent
-    WebSockets
     Sql
     Qml
 )
+# WebSockets is optional — install via Qt Maintenance Tool if needed
+find_package(Qt6 OPTIONAL_COMPONENTS WebSockets)
+if(Qt6WebSockets_FOUND)
+    message(STATUS "Qt6 WebSockets: found")
+else()
+    message(WARNING "Qt6 WebSockets not found — WebSocket features disabled")
+endif()
 
 qt_standard_project_setup(REQUIRES 6.5)
 

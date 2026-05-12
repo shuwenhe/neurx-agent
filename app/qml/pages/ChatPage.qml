@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic
+import "../components"
 
 Item {
     id: page
@@ -67,13 +68,14 @@ Item {
                     border.color: msgInput.activeFocus ? page.palette.accent : page.palette.border
                     radius: 8
 
-                    TextInput {
+                    TextField {
                         id: msgInput
                         anchors { fill: parent; leftMargin: 14; rightMargin: 14 }
                         verticalAlignment: TextInput.AlignVCenter
                         font { family: "Inter"; pixelSize: 14 }
                         color: page.palette.textPrim
                         placeholderText: qsTr("Message an agent…")
+                        background: null
                         clip: true
 
                         Keys.onReturnPressed: sendBtn.clicked()

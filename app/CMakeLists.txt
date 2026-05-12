@@ -22,10 +22,6 @@ qt_add_qml_module(neurx_app
         qml/components/ChatBubble.qml
         qml/components/StatusDot.qml
         qml/components/SideNav.qml
-    RESOURCES
-        resources/fonts/Inter-Regular.ttf
-        resources/fonts/Inter-Bold.ttf
-        resources/icons/neurx.png
 )
 
 target_include_directories(neurx_app PRIVATE

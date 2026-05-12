@@ -1,8 +1,5 @@
 #include "PluginLoader.h"
 #include "builtin/WebSearchTool.h"
-#include "builtin/FileSystemTool.h"
-#include "builtin/ShellTool.h"
-#include "builtin/HttpTool.h"
 #include "builtin/ReActAgent.h"
 #include "../core/tools/ToolRegistry.h"
 #include "../core/agent/AgentRegistry.h"
