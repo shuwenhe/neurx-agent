@@ -55,9 +55,9 @@ Item {
     property int waitingDotPhase: 0
     property bool streamCursorOn: true
     readonly property var waitingHints: [
-        qsTr("Loading"),
+        qsTr("Considering"),
         qsTr("Analyzing"),
-        qsTr("Generating")
+        qsTr("Planning")
     ]
 
     // Slash command definitions
@@ -195,6 +195,8 @@ Item {
         const dots = page.waitingDotPhase === 0 ? "." : (page.waitingDotPhase === 1 ? ".." : "...")
         if (page.currentToolRunning && page.currentToolName.length > 0)
             return qsTr("Running") + ": " + page.currentToolName.replace("codex_", "") + dots
+        if (page.pendingContent.length > 0)
+            return qsTr("Generating") + dots
         return page.waitingHints[page.waitingHintIndex] + dots
     }
 
