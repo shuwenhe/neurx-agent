@@ -69,17 +69,19 @@ QString stripDiffPathPrefix(QString path)
     return path;
 }
 
-bool patchTargetsOnlyPath(const QString &patch, const QString &targetPath, QString *error)
+bool patchTargetsWithinWorkspace(const QString &patch,
+                                 QStringList *resolvedPaths,
+                                 QString *error)
 {
     const QString root = workspaceRoot();
-    const QString target = resolveWorkspacePath(targetPath);
-    if (root.isEmpty() || target.isEmpty()) {
+    if (root.isEmpty()) {
         if (error)
-            *error = QStringLiteral("Patch target must stay inside workspace.");
+            *error = QStringLiteral("Workspace root is unavailable.");
         return false;
     }
 
     bool foundPath = false;
+    QStringList touchedPaths;
     const QStringList lines = patch.split(QLatin1Char('\n'));
     for (const QString &line : lines) {
         QStringList paths;
@@ -102,19 +104,26 @@ bool patchTargetsOnlyPath(const QString &patch, const QString &targetPath, QStri
                 return false;
             }
 
-            const QString resolved = QFileInfo(QDir(root).absoluteFilePath(path)).absoluteFilePath();
-            if (resolved != target) {
+            const QString resolved = resolveWorkspacePath(path);
+            if (resolved.isEmpty()) {
                 if (error)
-                    *error = QStringLiteral("Patch is only approved for %1. Found %2.")
-                                 .arg(target, resolved);
+                    *error = QStringLiteral("Patch file path must stay inside workspace: %1")
+                                 .arg(path);
                 return false;
             }
+
+            if (!touchedPaths.contains(resolved))
+                touchedPaths.append(resolved);
             foundPath = true;
         }
     }
 
     if (!foundPath && error)
         *error = QStringLiteral("Patch must be a unified diff with file headers.");
+
+    if (foundPath && resolvedPaths)
+        *resolvedPaths = touchedPaths;
+
     return foundPath;
 }
 
@@ -509,11 +518,16 @@ void RuntimeBridge::revealInFinder(const QString &filePath)
 QVariantMap RuntimeBridge::applyApprovedPatch(const QString &filePath, const QString &patch)
 {
     const QString trimmedPath = filePath.trimmed();
-    if (trimmedPath.isEmpty()) {
-        return {
-            {QStringLiteral("ok"), false},
-            {QStringLiteral("error"), QStringLiteral("filePath is required")}
-        };
+    QString resolvedRequestedPath;
+    if (!trimmedPath.isEmpty()) {
+        resolvedRequestedPath = resolveWorkspacePath(trimmedPath);
+        if (resolvedRequestedPath.isEmpty()) {
+            return {
+                {QStringLiteral("ok"), false},
+                {QStringLiteral("error"), QStringLiteral("filePath must stay inside workspace")},
+                {QStringLiteral("filePath"), trimmedPath}
+            };
+        }
     }
 
     const QString trimmedPatch = patch.trimmed();
@@ -524,21 +538,13 @@ QVariantMap RuntimeBridge::applyApprovedPatch(const QString &filePath, const QSt
         };
     }
 
-    const QString resolvedTarget = resolveWorkspacePath(trimmedPath);
-    if (resolvedTarget.isEmpty()) {
-        return {
-            {QStringLiteral("ok"), false},
-            {QStringLiteral("error"), QStringLiteral("filePath must stay inside workspace")},
-            {QStringLiteral("filePath"), trimmedPath}
-        };
-    }
-
     QString validationError;
-    if (!patchTargetsOnlyPath(trimmedPatch, resolvedTarget, &validationError)) {
+    QStringList touchedPaths;
+    if (!patchTargetsWithinWorkspace(trimmedPatch, &touchedPaths, &validationError)) {
         return {
             {QStringLiteral("ok"), false},
             {QStringLiteral("error"), validationError},
-            {QStringLiteral("filePath"), resolvedTarget}
+            {QStringLiteral("filePath"), resolvedRequestedPath.isEmpty() ? trimmedPath : resolvedRequestedPath}
         };
     }
 
@@ -550,7 +556,7 @@ QVariantMap RuntimeBridge::applyApprovedPatch(const QString &filePath, const QSt
             {QStringLiteral("ok"), false},
             {QStringLiteral("error"), checkResult.value(QStringLiteral("error")).toString()},
             {QStringLiteral("stderr"), checkResult.value(QStringLiteral("stderr")).toString()},
-            {QStringLiteral("filePath"), resolvedTarget}
+            {QStringLiteral("filePath"), resolvedRequestedPath.isEmpty() ? trimmedPath : resolvedRequestedPath}
         };
     }
 
@@ -562,14 +568,25 @@ QVariantMap RuntimeBridge::applyApprovedPatch(const QString &filePath, const QSt
             {QStringLiteral("ok"), false},
             {QStringLiteral("error"), applyResult.value(QStringLiteral("error")).toString()},
             {QStringLiteral("stderr"), applyResult.value(QStringLiteral("stderr")).toString()},
-            {QStringLiteral("filePath"), resolvedTarget}
+            {QStringLiteral("filePath"), resolvedRequestedPath.isEmpty() ? trimmedPath : resolvedRequestedPath}
         };
     }
 
-    emit fileChanged(resolvedTarget);
+    QVariantList changedPathList;
+    for (const QString &pathEntry : touchedPaths) {
+        changedPathList.append(pathEntry);
+        emit fileChanged(pathEntry);
+    }
+
+    const QString primaryPath = !resolvedRequestedPath.isEmpty()
+        ? resolvedRequestedPath
+        : (touchedPaths.isEmpty() ? QString() : touchedPaths.first());
+
     return {
         {QStringLiteral("ok"), true},
-        {QStringLiteral("filePath"), resolvedTarget},
+        {QStringLiteral("filePath"), primaryPath},
+        {QStringLiteral("path"), primaryPath},
+        {QStringLiteral("paths"), changedPathList},
         {QStringLiteral("stdout"), applyResult.value(QStringLiteral("stdout")).toString()},
         {QStringLiteral("stderr"), applyResult.value(QStringLiteral("stderr")).toString()}
     };
