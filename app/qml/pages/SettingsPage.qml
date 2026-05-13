@@ -22,14 +22,18 @@ Item {
         SettingRow {
             label: qsTr("API Endpoint")
             placeholder: "https://api.openai.com/v1/chat/completions"
+            initialValue: Runtime.chatEndpoint
+            onValueChanged: (v) => Runtime.chatEndpoint = v
         }
         SettingRow {
             label: qsTr("API Key")
             placeholder: "sk-…"
             echoMode: TextInput.Password
+            initialValue: Runtime.chatApiKey
+            onValueChanged: (v) => Runtime.chatApiKey = v
         }
         SettingRow {
-            label: qsTr("Model")
+            label: qsTr("Default Model")
             placeholder: "gpt-4o"
         }
 
@@ -62,7 +66,9 @@ Item {
     component SettingRow: RowLayout {
         required property string label
         required property string placeholder
-        property int echoMode: TextInput.Normal
+        property int    echoMode: TextInput.Normal
+        property string initialValue: ""
+        signal valueChanged(string v)
 
         Layout.fillWidth: true
         spacing: 16
@@ -78,18 +84,21 @@ Item {
             Layout.fillWidth: true
             height: 40
             color: "#1a1a1a"
-            border.color: page.palette.border
+            border.color: field.activeFocus ? page.palette.accent : page.palette.border
             radius: 6
 
             TextField {
+                id: field
                 anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                 verticalAlignment: TextInput.AlignVCenter
                 font { pixelSize: 14 }
                 color: page.palette.textPrim
                 placeholderText: parent.parent.placeholder
                 echoMode: parent.parent.echoMode
+                text: parent.parent.initialValue
                 background: null
                 clip: true
+                onEditingFinished: parent.parent.valueChanged(text)
             }
         }
     }

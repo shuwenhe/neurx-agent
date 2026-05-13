@@ -97,21 +97,60 @@ Item {
             }
         }
 
-        ListView {
-            id: msgList
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            model: chatHistory
-            spacing: 0
-            clip: true
-            onCountChanged: positionViewAtEnd()
 
-            topMargin: 16
-            leftMargin: 16
-            rightMargin: 16
+            ListView {
+                id: msgList
+                anchors.fill: parent
+                model: chatHistory
+                spacing: 0
+                clip: true
+                onCountChanged: positionViewAtEnd()
 
-            delegate: ChatBubble {
-                width: msgList.width - 32
+                topMargin: 16
+                leftMargin: 16
+                rightMargin: 16
+
+                delegate: ChatBubble {
+                    width: msgList.width - 32
+                }
+            }
+
+            // Empty-state hint
+            Column {
+                anchors.centerIn: parent
+                spacing: 12
+                visible: chatHistory.count === 0
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "💬"
+                    font.pixelSize: 40
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: qsTr("Start a conversation")
+                    font { pixelSize: 16; weight: Font.Medium }
+                    color: page.palette.textPrim
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 320
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    text: {
+                        const isOllama = page.selectedModelId.includes(":")
+                        if (isOllama)
+                            return qsTr("Local model selected. Make sure Ollama is running, then type a message below.")
+                        if (!Runtime.chatApiKey)
+                            return qsTr("No API key set. Go to Settings → API Key to add one, then come back and start chatting.")
+                        return qsTr("Type a message below to chat with ") + page.selectedModelLabel + "."
+                    }
+                    font.pixelSize: 13
+                    color: page.palette.textSec
+                }
             }
         }
 
