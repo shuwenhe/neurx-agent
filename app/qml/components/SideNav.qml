@@ -1,123 +1,166 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {
     id: nav
-    color: "#111111"
+    color: "#181818"
 
     required property int currentIndex
+    property string explorerRoot: "/Users/feifei"
     signal pageRequested(int index)
 
     readonly property var pages: [
-        { icon: "⊞", label: qsTr("Dashboard") },
-        { icon: "⬡", label: qsTr("Agents")    },
-        { icon: "💬", label: qsTr("Chat")      },
-        { icon: "🔧", label: qsTr("Tools")     },
-        { icon: "⚙", label: qsTr("Settings")  },
+        { icon: "⌂", label: qsTr("Dashboard") },
+        { icon: "◌", label: qsTr("Agents") },
+        { icon: "◫", label: qsTr("Chat") },
+        { icon: "◇", label: qsTr("Tools") },
+        { icon: "⚙", label: qsTr("Settings") },
     ]
 
-    ColumnLayout {
-        anchors { top: parent.top; left: parent.left; right: parent.right }
+    RowLayout {
+        anchors.fill: parent
         spacing: 0
 
-        // Logo / title
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 64
+        Rectangle {
+            Layout.fillHeight: true
+            Layout.preferredWidth: 48
+            color: "#181818"
+            border.color: "#2a2a2a"
 
-            Text {
-                anchors.centerIn: parent
-                text: "NeurX"
-                font { pixelSize: 22; weight: Font.Bold }
-                color: "#6c63ff"
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                ActivityButton {
+                    icon: "▱"
+                    active: true
+                    tooltip: qsTr("Explorer")
+                }
+
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#2a2a2a" }
+
+                Repeater {
+                    model: nav.pages.length
+                    delegate: ActivityButton {
+                        required property int index
+                        readonly property var page: nav.pages[index]
+                        icon: page.icon
+                        active: index === nav.currentIndex
+                        tooltip: page.label
+                        onClicked: nav.pageRequested(index)
+                    }
+                }
+
+                Item { Layout.fillHeight: true }
+
+                ActivityButton {
+                    icon: "◉"
+                    active: Runtime.running
+                    tooltip: Runtime.running ? qsTr("Runtime active") : qsTr("Runtime stopped")
+                }
             }
         }
-
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#2a2a2a" }
-
-        // Nav items
-        Repeater {
-            model: nav.pages.length
-            delegate: NavItem {
-                required property int index
-                readonly property var page: nav.pages[index]
-                Layout.fillWidth: true
-                icon:    page.icon
-                label:   page.label
-                active:  index === nav.currentIndex
-                onClicked: nav.pageRequested(index)
-            }
-        }
-    }
-
-    // Runtime status at bottom
-    Item {
-        anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-        height: 48
-
-        RowLayout {
-            anchors { fill: parent; margins: 16 }
-            spacing: 8
-
-            StatusDot {
-                active: Runtime.running
-            }
-            Text {
-                text: Runtime.running ? qsTr("Runtime active") : qsTr("Runtime stopped")
-                color: "#9a9a9a"
-                font { pixelSize: 12 }
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-            }
-        }
-    }
-
-    // Inline NavItem component
-    component NavItem: Rectangle {
-        id: item
-        required property string icon
-        required property string label
-        required property bool   active
-        signal clicked()
-
-        height: 48
-        color: active ? "#1e1e2e"
-             : hovered ? "#181818" : "transparent"
-        radius: 0
-
-        property bool hovered: false
 
         Rectangle {
-            width: 3; height: parent.height
-            color: "#6c63ff"
-            visible: item.active
-            anchors.left: parent.left
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            color: "#111111"
+            border.color: "#2a2a2a"
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 38
+                    spacing: 6
+
+                    Text {
+                        Layout.leftMargin: 20
+                        Layout.fillWidth: true
+                        text: qsTr("EXPLORER")
+                        color: "#cccccc"
+                        font { pixelSize: 11; capitalization: Font.AllUppercase }
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.rightMargin: 12
+                        text: "..."
+                        color: "#858585"
+                        font.pixelSize: 14
+                    }
+                }
+
+                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#252525" }
+
+                Flickable {
+                    id: explorerScroll
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    contentWidth: Math.max(width, explorerColumn.implicitWidth)
+                    contentHeight: explorerColumn.implicitHeight
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: explorerColumn
+                        width: Math.max(explorerScroll.width, implicitWidth)
+
+                        ExplorerNode {
+                            name: "FEIFEI"
+                            path: nav.explorerRoot
+                            isDir: true
+                            depth: 0
+                            expanded: true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    component ActivityButton: Rectangle {
+        id: activity
+        required property string icon
+        property bool active: false
+        property string tooltip: ""
+        signal clicked()
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 48
+        color: mouse.containsMouse ? "#202020" : "transparent"
+
+        Rectangle {
+            width: 2
+            height: 28
+            radius: 1
+            color: "#ffffff"
+            visible: activity.active
+            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
         }
 
-        RowLayout {
-            anchors { fill: parent; leftMargin: 20; rightMargin: 12 }
-            spacing: 12
-
-            Text {
-                text: item.icon
-                font.pixelSize: 18
-                color: item.active ? "#6c63ff" : "#9a9a9a"
-            }
-            Text {
-                text: item.label
-                font { pixelSize: 14 }
-                color: item.active ? "#f0f0f0" : "#9a9a9a"
-                Layout.fillWidth: true
-            }
+        Text {
+            anchors.centerIn: parent
+            text: activity.icon
+            color: activity.active ? "#ffffff" : "#858585"
+            font.pixelSize: 20
         }
+
+        ToolTip.visible: mouse.containsMouse && activity.tooltip.length > 0
+        ToolTip.text: activity.tooltip
+        ToolTip.delay: 500
 
         MouseArea {
+            id: mouse
             anchors.fill: parent
             hoverEnabled: true
-            onEntered: item.hovered = true
-            onExited:  item.hovered = false
-            onClicked: item.clicked()
+            cursorShape: Qt.PointingHandCursor
+            onClicked: activity.clicked()
         }
     }
 }

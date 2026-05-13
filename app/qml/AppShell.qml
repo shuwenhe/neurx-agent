@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls.Basic
 import "components"
 import "pages"
 
@@ -27,7 +26,7 @@ Item {
         SideNav {
             id: sideNav
             Layout.fillHeight: true
-            Layout.preferredWidth: 220
+            Layout.preferredWidth: 304
             currentIndex: pageStack.currentIndex
             onPageRequested: (idx) => pageStack.currentIndex = idx
         }

@@ -20,8 +20,10 @@ qt_add_qml_module(neurx_app
         qml/pages/SettingsPage.qml
         qml/components/AgentCard.qml
         qml/components/ChatBubble.qml
+        qml/components/ExplorerChildren.qml
         qml/components/StatusDot.qml
         qml/components/SideNav.qml
+        qml/components/ExplorerNode.qml
 )
 
 target_include_directories(neurx_app PRIVATE
