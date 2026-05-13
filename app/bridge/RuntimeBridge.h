@@ -3,6 +3,7 @@
 #include <QString>
 #include <QVariantList>
 #include "runtime/AgentRuntime.h"
+#include "llm/LlmClient.h"
 
 namespace neurx {
 
@@ -15,6 +16,8 @@ class RuntimeBridge : public QObject
     Q_PROPERTY(QVariantList localModels READ localModels NOTIFY localModelsChanged)
     Q_PROPERTY(QString localModelStatus READ localModelStatus NOTIFY localModelsChanged)
     Q_PROPERTY(QString localModelSource READ localModelSource NOTIFY localModelsChanged)
+    Q_PROPERTY(QString chatApiKey  READ chatApiKey  WRITE setChatApiKey  NOTIFY chatApiKeyChanged)
+    Q_PROPERTY(QString chatEndpoint READ chatEndpoint WRITE setChatEndpoint NOTIFY chatEndpointChanged)
 
 public:
     explicit RuntimeBridge(AgentRuntime *runtime, QObject *parent = nullptr);
@@ -24,25 +27,41 @@ public:
     QVariantList localModels() const;
     QString localModelStatus() const;
     QString localModelSource() const;
+    QString chatApiKey() const;
+    void    setChatApiKey(const QString &key);
+    QString chatEndpoint() const;
+    void    setChatEndpoint(const QString &ep);
 
 public slots:
     Q_INVOKABLE void startRuntime();
     Q_INVOKABLE void shutdownRuntime();
     Q_INVOKABLE void refreshLocalModels();
+    Q_INVOKABLE void sendChatMessage(const QString &modelId, const QString &text);
+    Q_INVOKABLE void clearChatContext();
 
 signals:
     void runningChanged(bool running);
     void agentCountChanged(int count);
     void localModelsChanged();
+    void chatApiKeyChanged();
+    void chatEndpointChanged();
+    void chatChunkReceived(const QString &delta);
+    void chatStreamFinished(const QString &fullContent);
+    void chatErrorOccurred(const QString &error);
 
 private:
     QString resolveOllamaExecutable() const;
     QVariantList detectOllamaModels() const;
+    QString resolveEndpointForModel(const QString &modelId) const;
 
-    AgentRuntime *m_runtime;
-    QVariantList  m_localModels;
-    QString       m_localModelStatus;
-    QString       m_localModelSource;
+    AgentRuntime     *m_runtime;
+    QVariantList      m_localModels;
+    QString           m_localModelStatus;
+    QString           m_localModelSource;
+    QString           m_chatApiKey;
+    QString           m_chatEndpoint;
+    LlmClient        *m_chatClient{nullptr};
+    QList<LlmMessage> m_chatContext;
 };
 
 } // namespace neurx

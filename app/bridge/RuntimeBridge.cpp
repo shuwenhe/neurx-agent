@@ -45,6 +45,66 @@ QString RuntimeBridge::localModelSource() const
 void RuntimeBridge::startRuntime()    { m_runtime->start();    }
 void RuntimeBridge::shutdownRuntime() { m_runtime->shutdown(); }
 
+QString RuntimeBridge::chatApiKey() const { return m_chatApiKey; }
+void RuntimeBridge::setChatApiKey(const QString &key)
+{
+    if (m_chatApiKey == key) return;
+    m_chatApiKey = key;
+    emit chatApiKeyChanged();
+}
+
+QString RuntimeBridge::chatEndpoint() const { return m_chatEndpoint; }
+void RuntimeBridge::setChatEndpoint(const QString &ep)
+{
+    if (m_chatEndpoint == ep) return;
+    m_chatEndpoint = ep;
+    emit chatEndpointChanged();
+}
+
+QString RuntimeBridge::resolveEndpointForModel(const QString &modelId) const
+{
+    // Ollama model IDs use the form "name:tag" (e.g. "qwen3:8b")
+    if (modelId.contains(QLatin1Char(':')))
+        return QStringLiteral("http://localhost:11434/v1/chat/completions");
+    return m_chatEndpoint.isEmpty()
+        ? QStringLiteral("https://api.openai.com/v1/chat/completions")
+        : m_chatEndpoint;
+}
+
+void RuntimeBridge::sendChatMessage(const QString &modelId, const QString &text)
+{
+    LlmConfig cfg;
+    cfg.endpoint    = resolveEndpointForModel(modelId);
+    cfg.apiKey      = modelId.contains(QLatin1Char(':'))
+                      ? QStringLiteral("ollama") : m_chatApiKey;
+    cfg.model       = modelId;
+    cfg.temperature = 0.7;
+    cfg.maxTokens   = 4096;
+
+    if (!m_chatClient) {
+        m_chatClient = new LlmClient(cfg, this);
+        connect(m_chatClient, &LlmClient::chunkReceived,
+                this, &RuntimeBridge::chatChunkReceived);
+        connect(m_chatClient, &LlmClient::streamFinished,
+                this, [this](const QString &content) {
+            m_chatContext.append({QStringLiteral("assistant"), content});
+            emit chatStreamFinished(content);
+        });
+        connect(m_chatClient, &LlmClient::errorOccurred,
+                this, &RuntimeBridge::chatErrorOccurred);
+    } else {
+        m_chatClient->setConfig(cfg);
+    }
+
+    m_chatContext.append({QStringLiteral("user"), text});
+    m_chatClient->chatStream(m_chatContext);
+}
+
+void RuntimeBridge::clearChatContext()
+{
+    m_chatContext.clear();
+}
+
 void RuntimeBridge::refreshLocalModels()
 {
     const QString executable = resolveOllamaExecutable();

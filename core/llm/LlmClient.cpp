@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QNetworkRequest>
 #include <QNetworkReply>
+#include <memory>
 
 namespace neurx {
 
@@ -88,9 +89,9 @@ void LlmClient::chatStream(const QList<LlmMessage> &messages,
                           .toJson(QJsonDocument::Compact);
 
     auto *reply = m_nam->post(buildRequest(), body);
-    QString accumulated;
+    auto accumulated = std::make_shared<QString>();
 
-    connect(reply, &QNetworkReply::readyRead, this, [this, reply, &accumulated]() {
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply, accumulated]() {
         const auto lines = reply->readAll().split('\n');
         for (const auto &line : lines) {
             if (!line.startsWith("data: ")) continue;
@@ -99,18 +100,18 @@ void LlmClient::chatStream(const QList<LlmMessage> &messages,
             const auto doc = QJsonDocument::fromJson(data);
             const auto delta = doc["choices"][0]["delta"]["content"].toString();
             if (!delta.isEmpty()) {
-                accumulated += delta;
+                *accumulated += delta;
                 emit chunkReceived(delta);
             }
         }
     });
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, accumulated]() mutable {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, accumulated]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError)
             emit errorOccurred(reply->errorString());
         else
-            emit streamFinished(accumulated);
+            emit streamFinished(*accumulated);
     });
 }
 

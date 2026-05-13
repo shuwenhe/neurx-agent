@@ -15,6 +15,9 @@ Item {
     property string selectedPermissions: qsTr("Default permissions")
     property bool ideContextEnabled: true
     property bool workLocally: true
+    property bool isWaiting: false
+    property int  pendingMsgIdx: -1
+    property string pendingContent: ""
 
     function openMenuNear(anchor, menu) {
         const pos = anchor.mapToItem(page, 0, 0)
@@ -202,26 +205,34 @@ Item {
                             id: sendBtn
                             Layout.preferredWidth: 34
                             Layout.preferredHeight: 34
-                            color: msgInput.text.trim().length > 0 ? page.palette.textPrim : "#5f5f5f"
+                            color: (msgInput.text.trim().length > 0 && !page.isWaiting)
+                                   ? page.palette.textPrim : "#5f5f5f"
                             radius: 17
 
                             signal clicked()
                             onClicked: {
                                 const text = msgInput.text.trim()
-                                if (!text)
+                                if (!text || page.isWaiting)
                                     return
 
                                 chatHistory.append({
                                     role: "user",
-                                    content: text + "\n\n" + qsTr("Model: ") + page.selectedModelLabel + " · " + page.selectedEffort,
-                                    time: Qt.formatTime(new Date(), "hh:mm"),
-                                    model: page.selectedModelId,
-                                    effort: page.selectedEffort,
-                                    permissions: page.selectedPermissions,
-                                    ideContext: page.ideContextEnabled
+                                    content: text,
+                                    time: Qt.formatTime(new Date(), "hh:mm")
                                 })
+
+                                // placeholder bubble while waiting
+                                chatHistory.append({
+                                    role: "assistant",
+                                    content: "●●●",
+                                    time: ""
+                                })
+                                page.pendingMsgIdx = chatHistory.count - 1
+                                page.pendingContent = ""
+                                page.isWaiting = true
                                 msgInput.text = ""
-                                // TODO: route selected model/effort/permissions to Runtime.
+
+                                Runtime.sendChatMessage(page.selectedModelId, text)
                             }
 
                             Text {
@@ -431,6 +442,35 @@ Item {
 
         function onLocalModelsChanged() {
             page.syncRuntimeModels()
+        }
+
+        function onChatChunkReceived(delta) {
+            page.pendingContent += delta
+            if (page.pendingMsgIdx >= 0)
+                chatHistory.setProperty(page.pendingMsgIdx, "content", page.pendingContent)
+        }
+
+        function onChatStreamFinished(fullContent) {
+            if (page.pendingMsgIdx >= 0) {
+                chatHistory.setProperty(page.pendingMsgIdx, "content", fullContent)
+                chatHistory.setProperty(page.pendingMsgIdx, "time",
+                    Qt.formatTime(new Date(), "hh:mm"))
+            }
+            page.pendingMsgIdx = -1
+            page.pendingContent = ""
+            page.isWaiting = false
+        }
+
+        function onChatErrorOccurred(error) {
+            if (page.pendingMsgIdx >= 0) {
+                chatHistory.setProperty(page.pendingMsgIdx, "content",
+                    qsTr("Error: ") + error)
+                chatHistory.setProperty(page.pendingMsgIdx, "time",
+                    Qt.formatTime(new Date(), "hh:mm"))
+            }
+            page.pendingMsgIdx = -1
+            page.pendingContent = ""
+            page.isWaiting = false
         }
     }
 
