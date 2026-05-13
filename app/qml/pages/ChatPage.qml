@@ -54,6 +54,7 @@ Item {
     property int waitingHintIndex: 0
     property int waitingDotPhase: 0
     property bool streamCursorOn: true
+    property int streamElapsedSec: 0
     readonly property var waitingHints: [
         qsTr("Considering"),
         qsTr("Analyzing"),
@@ -175,6 +176,7 @@ Item {
         page.pendingMsgIdx = chatHistory.count - 1
         page.pendingContent = ""
         page.streamCursorOn = true
+        page.streamElapsedSec = 0
         page.waitingHintIndex = 0
         page.waitingDotPhase = 0
         page.isWaiting = true
@@ -901,7 +903,7 @@ Item {
                 Text {
                     text: page.currentToolRunning
                         ? (page.currentToolIteration + "/" + page.maxToolIterations)
-                        : qsTr("wait")
+                        : (page.streamElapsedSec + "s")
                     color: page.palette.textSec
                     font.pixelSize: 10
                     Layout.preferredWidth: 30
@@ -1521,6 +1523,7 @@ Item {
             page.pendingMsgIdx = -1
             page.pendingContent = ""
             page.streamCursorOn = true
+            page.streamElapsedSec = 0
             page.isWaiting = false
 
             if (approval) {
@@ -1579,6 +1582,7 @@ Item {
             page.pendingMsgIdx = -1
             page.pendingContent = ""
             page.streamCursorOn = true
+            page.streamElapsedSec = 0
             page.isWaiting = false
             page.currentToolRunning = false
         }
@@ -1615,6 +1619,7 @@ Item {
             page.pendingMsgIdx = -1
             page.pendingContent = ""
             page.streamCursorOn = true
+            page.streamElapsedSec = 0
         }
     }
 
@@ -1651,6 +1656,17 @@ Item {
                 return
             page.streamCursorOn = !page.streamCursorOn
             chatHistory.setProperty(page.pendingMsgIdx, "content", page.renderStreamingContent())
+        }
+    }
+
+    Timer {
+        id: streamElapsedTimer
+        interval: 1000
+        repeat: true
+        running: page.isWaiting
+        onTriggered: {
+            if (page.isWaiting)
+                page.streamElapsedSec += 1
         }
     }
 
