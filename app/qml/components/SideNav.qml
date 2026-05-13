@@ -11,7 +11,7 @@ Rectangle {
     required property int currentIndex
     property string explorerRoot: "/Users/feifei"
     property string focusPath: ""
-    property Item scrollTarget: null
+    property int focusRequest: 0
     signal pageRequested(int index)
     signal fileRequested(string filePath, string fileName)
 
@@ -121,6 +121,7 @@ Rectangle {
                             depth: 0
                             expanded: true
                             focusPath: nav.focusPath
+                            focusRequest: nav.focusRequest
                             scrollTarget: explorerScroll
                             onFileActivated: (selectedPath, selectedName) =>
                                 nav.fileRequested(selectedPath, selectedName)

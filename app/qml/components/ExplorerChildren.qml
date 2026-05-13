@@ -10,7 +10,8 @@ Column {
     property int depth: 1
     property bool showHidden: false
     property string focusPath: ""
-    property Item scrollTarget: null
+    property int focusRequest: 0
+    property Flickable scrollTarget: null
     signal fileActivated(string filePath, string fileName)
 
     FolderListModel {
@@ -38,6 +39,7 @@ Column {
             isDir: fileIsDir
             depth: children.depth
             focusPath: children.focusPath
+            focusRequest: children.focusRequest
             scrollTarget: children.scrollTarget
             onFileActivated: (selectedPath, selectedName) =>
                 children.fileActivated(selectedPath, selectedName)

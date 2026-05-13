@@ -10,6 +10,7 @@ Item {
     property string selectedFileName: ""
     property string selectedFileContent: ""
     property string explorerFocusPath: ""
+    property int explorerFocusRequest: 0
     property int activeEditorIndex: -1
     property real explorerPaneWidth: 304
     property real editorPaneWidth: 560
@@ -77,6 +78,7 @@ Item {
         selectedFileName = entry.fileName
         selectedFileContent = entry.content
         explorerFocusPath = selectedFilePath
+        explorerFocusRequest += 1
     }
 
     function openEditorFile(filePath, fileName, remember) {
@@ -105,6 +107,7 @@ Item {
 
         activeEditorIndex = index
         shell.syncActiveEditor()
+        shell.ensureNewestTabVisible()
 
         if (remember)
             Runtime.rememberOpenedEditorFile(filePath)
@@ -151,6 +154,14 @@ Item {
             closeEditorFile(activeEditorIndex)
     }
 
+    function ensureNewestTabVisible() {
+        Qt.callLater(function() {
+            if (!tabsFlick)
+                return
+            tabsFlick.contentX = Math.max(0, tabsFlick.contentWidth - tabsFlick.width)
+        })
+    }
+
     onWidthChanged: clampPaneWidths()
     Component.onCompleted: {
         clampPaneWidths()
@@ -169,6 +180,7 @@ Item {
             width: shell.explorerPaneWidth
             currentIndex: pageStack.currentIndex
             focusPath: shell.explorerFocusPath
+            focusRequest: shell.explorerFocusRequest
             onPageRequested: (idx) => pageStack.currentIndex = idx
             onFileRequested: (filePath, fileName) => {
                 shell.openEditorFile(filePath, fileName, true)
@@ -251,6 +263,7 @@ Item {
                     border.color: shell.border
 
                     Flickable {
+                        id: tabsFlick
                         anchors.fill: parent
                         clip: true
                         contentWidth: tabsRow.implicitWidth + 16
