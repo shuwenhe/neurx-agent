@@ -11,9 +11,9 @@
 namespace neurx {
 
 namespace {
-constexpr int kMaxContextMessages = 24;
-constexpr int kMaxCurrentFileChars = 12000;
-constexpr int kMaxToolIterations = 8;
+constexpr int kMaxContextMessages = 12;
+constexpr int kMaxCurrentFileChars = 4000;
+constexpr int kMaxToolIterations = 5;
 constexpr int kMaxPreviewChars = 320;
 
 QString clippedPreview(const QString &text)
@@ -171,6 +171,12 @@ void CodexAgent::submitPrompt(const QString &text, const QVariantMap &options)
 
     if (!m_client) {
         m_client = new LlmClient(m_config, this);
+        connect(m_client, &LlmClient::chunkReceived,
+                this, [this](const QString &delta) {
+            if (!m_busy || delta.isEmpty())
+                return;
+            emit chunkReceived(delta);
+        });
         connect(m_client, &LlmClient::responseReceived,
                 this, [this](const QString &content, const QVariantMap &toolCall) {
             if (!m_busy)

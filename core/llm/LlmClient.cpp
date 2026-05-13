@@ -65,13 +65,65 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
                      const QVariantList &tools)
 {
     const auto body = QJsonDocument::fromVariant(
-                          buildRequestBody(messages, tools, false))
+                          buildRequestBody(messages, tools, true))
                           .toJson(QJsonDocument::Compact);
 
     auto *reply = m_nam->post(buildRequest(), body);
     m_activeReply = reply;
-    // Shared flag so the timer and finished handler don't both emit.
+    auto accumulated = std::make_shared<QString>();
+    auto streamBuffer = std::make_shared<QByteArray>();
+    auto streamedToolId = std::make_shared<QString>();
+    auto streamedToolName = std::make_shared<QString>();
+    auto streamedToolArgs = std::make_shared<QString>();
+    auto streamApiError = std::make_shared<QString>();
     auto emitted = std::make_shared<bool>(false);
+
+    auto consumeDataChunk = [this, accumulated, streamedToolId, streamedToolName,
+                             streamedToolArgs, streamApiError](const QByteArray &data) {
+        const QByteArray trimmed = data.trimmed();
+        if (trimmed.isEmpty() || trimmed == "[DONE]")
+            return;
+
+        const auto doc = QJsonDocument::fromJson(trimmed);
+        if (doc.isNull() || !doc.isObject())
+            return;
+
+        const auto root = doc.object();
+        const QString inlineError = root.value(QStringLiteral("error")).toObject()
+            .value(QStringLiteral("message")).toString();
+        if (!inlineError.isEmpty()) {
+            *streamApiError = inlineError;
+            return;
+        }
+
+        const auto choices = root.value(QStringLiteral("choices")).toArray();
+        if (choices.isEmpty())
+            return;
+
+        const auto delta = choices.first().toObject().value(QStringLiteral("delta")).toObject();
+        const QString contentDelta = delta.value(QStringLiteral("content")).toString();
+        if (!contentDelta.isEmpty()) {
+            *accumulated += contentDelta;
+            emit chunkReceived(contentDelta);
+        }
+
+        const auto toolCalls = delta.value(QStringLiteral("tool_calls")).toArray();
+        for (const auto &toolVar : toolCalls) {
+            const auto toolObj = toolVar.toObject();
+            const QString id = toolObj.value(QStringLiteral("id")).toString();
+            if (!id.isEmpty())
+                *streamedToolId = id;
+
+            const auto functionObj = toolObj.value(QStringLiteral("function")).toObject();
+            const QString name = functionObj.value(QStringLiteral("name")).toString();
+            if (!name.isEmpty())
+                *streamedToolName = name;
+
+            const QString argsChunk = functionObj.value(QStringLiteral("arguments")).toString();
+            if (!argsChunk.isEmpty())
+                *streamedToolArgs += argsChunk;
+        }
+    };
 
     // Abort and report error if the server doesn't respond within the timeout.
     auto *timer = new QTimer(reply);
@@ -88,8 +140,29 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
     });
     timer->start(kRequestTimeoutMs);
 
+    connect(reply, &QNetworkReply::readyRead, this,
+            [this, reply, streamBuffer, consumeDataChunk]() {
+        if (m_ignoredReplies.contains(reply) || !reply->isOpen())
+            return;
+
+        *streamBuffer += reply->readAll();
+        while (true) {
+            const int newline = streamBuffer->indexOf('\n');
+            if (newline < 0)
+                break;
+
+            const QByteArray line = streamBuffer->left(newline).trimmed();
+            streamBuffer->remove(0, newline + 1);
+            if (!line.startsWith("data: "))
+                continue;
+            consumeDataChunk(line.mid(6));
+        }
+    });
+
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, messages, tools, emitted]() {
+            [this, reply, messages, tools, emitted, streamBuffer,
+             streamedToolId, streamedToolName, streamedToolArgs,
+             streamApiError, consumeDataChunk, accumulated]() {
         if (m_activeReply == reply)
             m_activeReply = nullptr;
         const bool ignored = m_ignoredReplies.remove(reply) > 0;
@@ -101,6 +174,13 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
             reply->deleteLater();
             return;
         }
+
+        if (!streamBuffer->isEmpty()) {
+            const QByteArray tail = streamBuffer->trimmed();
+            if (tail.startsWith("data: "))
+                consumeDataChunk(tail.mid(6));
+        }
+
         reply->deleteLater();
         *emitted = true;
 
@@ -125,9 +205,8 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
             return;
         }
 
-        const auto doc = QJsonDocument::fromJson(responseBody);
-        // Handle error returned in a 200 body (some providers do this).
-        const QString inlineError = doc["error"]["message"].toString();
+        // Handle stream-level errors returned in chunk payloads.
+        const QString inlineError = *streamApiError;
         if (!inlineError.isEmpty()) {
             if (!inlineError.isEmpty()
                 && inlineError.contains(QLatin1String("does not support tools"))
@@ -140,25 +219,16 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
             return;
         }
 
-        const auto choices = doc["choices"].toArray();
-        if (choices.isEmpty()) {
-            emit errorOccurred(QStringLiteral("Empty response from server."));
-            return;
-        }
-
-        const auto msg = choices[0]["message"].toObject();
-        QString content = msg["content"].toString();
         QVariantMap toolCall;
-        if (msg.contains("tool_calls")) {
-            const auto tc = msg["tool_calls"].toArray()[0].toObject();
-            const auto function = tc["function"].toObject();
+        if (!streamedToolName->isEmpty()) {
             toolCall = {
-                {"id",   tc["id"].toString()},
-                {"name", function["name"].toString()},
-                {"args", function["arguments"].toString()}
+                {"id",   *streamedToolId},
+                {"name", *streamedToolName},
+                {"args", *streamedToolArgs}
             };
         }
-        emit responseReceived(content, toolCall);
+
+        emit responseReceived(*accumulated, toolCall);
     });
 }
 

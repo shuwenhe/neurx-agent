@@ -263,7 +263,7 @@ LlmConfig RuntimeBridge::buildLlmConfig(const QString &modelId) const
                       ? QStringLiteral("ollama") : m_chatApiKey;
     cfg.model       = modelId;
     cfg.temperature = 0.7;
-    cfg.maxTokens   = 4096;
+    cfg.maxTokens   = 1024;
     return cfg;
 }
 
