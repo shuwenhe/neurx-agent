@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls.Basic
 
 Column {
     id: node
@@ -76,12 +77,38 @@ Column {
             id: rowMouse
             anchors.fill: parent
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
+
+            onPressed: function(mouse) {
+                if (mouse.button !== Qt.RightButton || node.isDir)
+                    return
+
+                fileContextMenu.targetPath = node.path
+                const p = row.mapToItem(null, mouse.x, mouse.y)
+                fileContextMenu.x = p.x
+                fileContextMenu.y = p.y
+                fileContextMenu.open()
+            }
+
+            onClicked: function(mouse) {
+                if (mouse.button !== Qt.LeftButton)
+                    return
+
                 if (node.isDir)
                     node.expanded = !node.expanded
                 else
                     node.fileActivated(node.path, node.name)
+            }
+        }
+
+        Menu {
+            id: fileContextMenu
+            property string targetPath: ""
+
+            MenuItem {
+                text: qsTr("Copy Path")
+                onTriggered: Runtime.copyToClipboard(fileContextMenu.targetPath)
             }
         }
     }

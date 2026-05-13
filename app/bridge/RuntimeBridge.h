@@ -39,6 +39,10 @@ public slots:
     Q_INVOKABLE void sendChatMessage(const QString &modelId, const QString &text);
     Q_INVOKABLE void clearChatContext();
     Q_INVOKABLE QString readLocalFile(const QString &filePath);
+    Q_INVOKABLE QString lastOpenedEditorFile() const;
+    Q_INVOKABLE void rememberOpenedEditorFile(const QString &filePath);
+    Q_INVOKABLE void copyToClipboard(const QString &text);
+    Q_INVOKABLE void revealInFinder(const QString &filePath);
 
 signals:
     void runningChanged(bool running);

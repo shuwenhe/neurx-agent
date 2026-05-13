@@ -1,14 +1,23 @@
 #include "RuntimeBridge.h"
 
+#include <QClipboard>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QDesktopServices>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QStandardPaths>
+#include <QUrl>
 #include <QStringList>
 #include <QVariantMap>
 
 namespace neurx {
+
+namespace {
+constexpr auto kLastOpenedEditorFileKey = "editor/lastOpenedFile";
+}
 
 RuntimeBridge::RuntimeBridge(AgentRuntime *runtime, QObject *parent)
     : QObject(parent), m_runtime(runtime)
@@ -125,6 +134,41 @@ QString RuntimeBridge::readLocalFile(const QString &filePath)
     if (truncated)
         content.append(QStringLiteral("\n\n... [preview truncated]") );
     return content;
+}
+
+QString RuntimeBridge::lastOpenedEditorFile() const
+{
+    const QString filePath = QSettings().value(QLatin1String(kLastOpenedEditorFileKey)).toString();
+    if (filePath.isEmpty() || !QFileInfo::exists(filePath))
+        return {};
+
+    return filePath;
+}
+
+void RuntimeBridge::rememberOpenedEditorFile(const QString &filePath)
+{
+    if (filePath.isEmpty())
+        return;
+
+    QSettings().setValue(QLatin1String(kLastOpenedEditorFileKey), filePath);
+}
+
+void RuntimeBridge::copyToClipboard(const QString &text)
+{
+    if (auto *clipboard = QGuiApplication::clipboard())
+        clipboard->setText(text);
+}
+
+void RuntimeBridge::revealInFinder(const QString &filePath)
+{
+    if (filePath.isEmpty() || !QFileInfo::exists(filePath))
+        return;
+
+#if defined(Q_OS_MACOS)
+    QProcess::startDetached(QStringLiteral("open"), {QStringLiteral("-R"), filePath});
+#else
+    QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(filePath).absolutePath()));
+#endif
 }
 
 void RuntimeBridge::refreshLocalModels()
