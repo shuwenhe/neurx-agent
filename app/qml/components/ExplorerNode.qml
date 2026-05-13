@@ -176,7 +176,8 @@ Column {
             item.parentPath = node.path
             item.depth = node.depth + 1
             item.showHidden = false
-            item.focusPath = node.focusPath
+            item.focusPath = Qt.binding(function() { return node.focusPath })
+            item.scrollTarget = Qt.binding(function() { return node.scrollTarget })
             item.fileActivated.connect(function(filePath, fileName) {
                 node.fileActivated(filePath, fileName)
             })

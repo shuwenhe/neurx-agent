@@ -95,6 +95,12 @@ Item {
                 content: Runtime.readLocalFile(filePath)
             })
             index = openFilesModel.count - 1
+        } else {
+            // Reopening an existing file makes it the newest tab on the far right.
+            if (index !== openFilesModel.count - 1) {
+                openFilesModel.move(index, openFilesModel.count - 1, 1)
+                index = openFilesModel.count - 1
+            }
         }
 
         activeEditorIndex = index
