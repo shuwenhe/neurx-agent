@@ -8,6 +8,7 @@ target_sources(neurx_core PRIVATE
     agent/AgentRegistry.cpp
     agent/AgentRunner.cpp
     agent/AgentMessage.cpp
+    agent/CodexAgent.cpp
     # Runtime
     runtime/AgentRuntime.cpp
     runtime/TaskScheduler.cpp

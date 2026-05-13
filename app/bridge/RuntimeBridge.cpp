@@ -27,6 +27,17 @@ RuntimeBridge::RuntimeBridge(AgentRuntime *runtime, QObject *parent)
     connect(&m_runtime->registry(), &AgentRegistry::countChanged,
             this, &RuntimeBridge::agentCountChanged);
 
+    m_codexAgent = new CodexAgent;
+    m_codexAgent->setWorkspaceRoot(QStringLiteral("/Users/feifei/neurx"));
+    m_runtime->registry().registerAgent(m_codexAgent);
+
+    connect(m_codexAgent, &CodexAgent::chunkReceived,
+            this, &RuntimeBridge::chatChunkReceived);
+    connect(m_codexAgent, &CodexAgent::responseFinished,
+            this, &RuntimeBridge::chatStreamFinished);
+    connect(m_codexAgent, &CodexAgent::errorOccurred,
+            this, &RuntimeBridge::chatErrorOccurred);
+
     refreshLocalModels();
 }
 
@@ -81,7 +92,7 @@ QString RuntimeBridge::resolveEndpointForModel(const QString &modelId) const
         : m_chatEndpoint;
 }
 
-void RuntimeBridge::sendChatMessage(const QString &modelId, const QString &text)
+LlmConfig RuntimeBridge::buildLlmConfig(const QString &modelId) const
 {
     LlmConfig cfg;
     cfg.endpoint    = resolveEndpointForModel(modelId);
@@ -90,29 +101,37 @@ void RuntimeBridge::sendChatMessage(const QString &modelId, const QString &text)
     cfg.model       = modelId;
     cfg.temperature = 0.7;
     cfg.maxTokens   = 4096;
+    return cfg;
+}
 
-    if (!m_chatClient) {
-        m_chatClient = new LlmClient(cfg, this);
-        connect(m_chatClient, &LlmClient::chunkReceived,
-                this, &RuntimeBridge::chatChunkReceived);
-        connect(m_chatClient, &LlmClient::streamFinished,
-                this, [this](const QString &content) {
-            m_chatContext.append({QStringLiteral("assistant"), content});
-            emit chatStreamFinished(content);
-        });
-        connect(m_chatClient, &LlmClient::errorOccurred,
-                this, &RuntimeBridge::chatErrorOccurred);
-    } else {
-        m_chatClient->setConfig(cfg);
+void RuntimeBridge::sendChatMessage(const QString &modelId,
+                                    const QString &text,
+                                    const QString &currentFilePath,
+                                    const QString &currentFileContent,
+                                    const QString &effort,
+                                    const QString &permissions,
+                                    bool ideContext)
+{
+    if (!m_codexAgent) {
+        emit chatErrorOccurred(QStringLiteral("Codex agent is not available."));
+        return;
     }
 
-    m_chatContext.append({QStringLiteral("user"), text});
-    m_chatClient->chatStream(m_chatContext);
+    QVariantMap options{
+        {QStringLiteral("effort"), effort},
+        {QStringLiteral("permissions"), permissions},
+        {QStringLiteral("ideContext"), ideContext}
+    };
+
+    m_codexAgent->setConfig(buildLlmConfig(modelId));
+    m_codexAgent->setCurrentFile(currentFilePath, currentFileContent);
+    m_codexAgent->submitPrompt(text, options);
 }
 
 void RuntimeBridge::clearChatContext()
 {
-    m_chatContext.clear();
+    if (m_codexAgent)
+        m_codexAgent->clearContext();
 }
 
 QString RuntimeBridge::readLocalFile(const QString &filePath)

@@ -13,12 +13,13 @@ Window {
     title: qsTr("NeurX AgentOS")
     color: "#0d0d0d"
 
-    Shortcut {
-        sequence: StandardKey.Close
-        onActivated: root.close()
+    AppShell {
+        id: shellView
+        anchors.fill: parent
     }
 
-    AppShell {
-        anchors.fill: parent
+    Shortcut {
+        sequence: StandardKey.Close
+        onActivated: shellView.closeCurrentEditor()
     }
 }

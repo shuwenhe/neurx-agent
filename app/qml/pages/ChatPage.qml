@@ -9,8 +9,8 @@ Item {
     id: page
     required property var palette
 
-    property string selectedModelId: "gpt-5.5"
-    property string selectedModelLabel: "GPT-5.5"
+    property string selectedModelId: "qwen2:0.5b"
+    property string selectedModelLabel: "qwen2:0.5b"
     property string selectedEffort: "Medium"
     property string selectedPermissions: qsTr("Default permissions")
     property bool ideContextEnabled: true
@@ -18,6 +18,8 @@ Item {
     property bool isWaiting: false
     property int  pendingMsgIdx: -1
     property string pendingContent: ""
+    property string currentFilePath: ""
+    property string currentFileContent: ""
 
     function openMenuNear(anchor, menu) {
         const pos = anchor.mapToItem(page, 0, 0)
@@ -51,6 +53,13 @@ Item {
             if (!hasModel(model.idValue))
                 availableModels.append(model)
         }
+    }
+
+    function scrollToLatest() {
+        Qt.callLater(function() {
+            if (chatHistory.count > 0)
+                msgList.positionViewAtEnd()
+        })
     }
 
     Component.onCompleted: {
@@ -91,7 +100,7 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: qsTr("Chat with Agents")
+                text: qsTr("Codex Agent")
                 font { pixelSize: 16; weight: Font.Medium }
                 color: page.palette.textPrim
             }
@@ -107,7 +116,11 @@ Item {
                 model: chatHistory
                 spacing: 0
                 clip: true
-                onCountChanged: positionViewAtEnd()
+                onCountChanged: page.scrollToLatest()
+                onContentHeightChanged: {
+                    if (page.isWaiting)
+                        page.scrollToLatest()
+                }
 
                 topMargin: 16
                 leftMargin: 16
@@ -271,7 +284,14 @@ Item {
                                 page.isWaiting = true
                                 msgInput.text = ""
 
-                                Runtime.sendChatMessage(page.selectedModelId, text)
+                                Runtime.sendChatMessage(
+                                    page.selectedModelId,
+                                    text,
+                                    page.currentFilePath,
+                                    page.currentFileContent,
+                                    page.selectedEffort,
+                                    page.selectedPermissions,
+                                    page.ideContextEnabled)
                             }
 
                             Text {
@@ -485,8 +505,10 @@ Item {
 
         function onChatChunkReceived(delta) {
             page.pendingContent += delta
-            if (page.pendingMsgIdx >= 0)
+            if (page.pendingMsgIdx >= 0) {
                 chatHistory.setProperty(page.pendingMsgIdx, "content", page.pendingContent)
+                page.scrollToLatest()
+            }
         }
 
         function onChatStreamFinished(fullContent) {
@@ -494,6 +516,7 @@ Item {
                 chatHistory.setProperty(page.pendingMsgIdx, "content", fullContent)
                 chatHistory.setProperty(page.pendingMsgIdx, "time",
                     Qt.formatTime(new Date(), "hh:mm"))
+                page.scrollToLatest()
             }
             page.pendingMsgIdx = -1
             page.pendingContent = ""
@@ -506,6 +529,7 @@ Item {
                     qsTr("Error: ") + error)
                 chatHistory.setProperty(page.pendingMsgIdx, "time",
                     Qt.formatTime(new Date(), "hh:mm"))
+                page.scrollToLatest()
             }
             page.pendingMsgIdx = -1
             page.pendingContent = ""

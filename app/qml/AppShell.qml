@@ -9,6 +9,8 @@ Item {
     property string selectedFilePath: ""
     property string selectedFileName: ""
     property string selectedFileContent: ""
+    property string explorerFocusPath: ""
+    property int activeEditorIndex: -1
     property real explorerPaneWidth: 304
     property real editorPaneWidth: 560
 
@@ -28,6 +30,10 @@ Item {
     readonly property color success:   "#22c55e"
     readonly property color warning:   "#f59e0b"
     readonly property color danger:    "#ef4444"
+
+    ListModel {
+        id: openFilesModel
+    }
 
     function clampPaneWidths() {
         const total = shell.width
@@ -49,18 +55,94 @@ Item {
         return parts.length > 0 ? parts[parts.length - 1] : filePath
     }
 
+    function findOpenFileIndex(filePath) {
+        for (let i = 0; i < openFilesModel.count; ++i) {
+            if (openFilesModel.get(i).filePath === filePath)
+                return i
+        }
+        return -1
+    }
+
+    function syncActiveEditor() {
+        if (activeEditorIndex < 0 || activeEditorIndex >= openFilesModel.count) {
+            selectedFilePath = ""
+            selectedFileName = ""
+            selectedFileContent = ""
+            explorerFocusPath = ""
+            return
+        }
+
+        const entry = openFilesModel.get(activeEditorIndex)
+        selectedFilePath = entry.filePath
+        selectedFileName = entry.fileName
+        selectedFileContent = entry.content
+        explorerFocusPath = selectedFilePath
+    }
+
     function openEditorFile(filePath, fileName, remember) {
         if (!filePath || filePath.length === 0)
             return
 
-        shell.selectedFilePath = filePath
-        shell.selectedFileName = fileName && fileName.length > 0
+        const resolvedName = fileName && fileName.length > 0
             ? fileName
             : shell.fileNameFromPath(filePath)
-        shell.selectedFileContent = Runtime.readLocalFile(filePath)
+
+        let index = shell.findOpenFileIndex(filePath)
+        if (index < 0) {
+            openFilesModel.append({
+                filePath: filePath,
+                fileName: resolvedName,
+                content: Runtime.readLocalFile(filePath)
+            })
+            index = openFilesModel.count - 1
+        }
+
+        activeEditorIndex = index
+        shell.syncActiveEditor()
 
         if (remember)
             Runtime.rememberOpenedEditorFile(filePath)
+    }
+
+    function selectEditorFile(index) {
+        if (index < 0 || index >= openFilesModel.count)
+            return
+
+        activeEditorIndex = index
+        syncActiveEditor()
+        Runtime.rememberOpenedEditorFile(selectedFilePath)
+    }
+
+    function closeEditorFile(index) {
+        if (index < 0 || index >= openFilesModel.count)
+            return
+
+        const closingPath = openFilesModel.get(index).filePath
+        const wasActive = index === activeEditorIndex
+
+        openFilesModel.remove(index)
+
+        if (openFilesModel.count === 0) {
+            activeEditorIndex = -1
+            syncActiveEditor()
+            return
+        }
+
+        if (wasActive) {
+            activeEditorIndex = Math.min(index, openFilesModel.count - 1)
+        } else if (index < activeEditorIndex) {
+            activeEditorIndex -= 1
+        }
+
+        syncActiveEditor()
+
+        if (selectedFilePath !== closingPath)
+            Runtime.rememberOpenedEditorFile(selectedFilePath)
+    }
+
+    function closeCurrentEditor() {
+        if (activeEditorIndex >= 0)
+            closeEditorFile(activeEditorIndex)
     }
 
     onWidthChanged: clampPaneWidths()
@@ -80,6 +162,7 @@ Item {
             height: parent.height
             width: shell.explorerPaneWidth
             currentIndex: pageStack.currentIndex
+            focusPath: shell.explorerFocusPath
             onPageRequested: (idx) => pageStack.currentIndex = idx
             onFileRequested: (filePath, fileName) => {
                 shell.openEditorFile(filePath, fileName, true)
@@ -157,6 +240,89 @@ Item {
 
                 Rectangle {
                     width: parent.width
+                    height: 38
+                    color: "#12161d"
+                    border.color: shell.border
+
+                    Flickable {
+                        anchors.fill: parent
+                        clip: true
+                        contentWidth: tabsRow.implicitWidth + 16
+                        contentHeight: tabsRow.implicitHeight
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        Row {
+                            id: tabsRow
+                            x: 8
+                            y: 0
+                            spacing: 1
+
+                            Repeater {
+                                model: openFilesModel
+
+                                delegate: Rectangle {
+                                    required property int index
+                                    required property string fileName
+                                    required property string filePath
+
+                                    width: Math.max(132, Math.min(240, tabLabel.implicitWidth + 42))
+                                    height: 38
+                                    color: index === shell.activeEditorIndex ? "#0f1115" : "#171c24"
+                                    border.color: index === shell.activeEditorIndex ? shell.accent : shell.border
+
+                                    Text {
+                                        id: tabLabel
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: fileName
+                                        color: index === shell.activeEditorIndex ? shell.textPrim : shell.textSec
+                                        elide: Text.ElideMiddle
+                                        font.pixelSize: 12
+                                    }
+
+                                    Rectangle {
+                                        width: 18
+                                        height: 18
+                                        radius: 9
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        visible: tabMouse.containsMouse || closeHover.containsMouse
+                                        color: closeHover.containsMouse ? "#313742" : "transparent"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "×"
+                                            color: index === shell.activeEditorIndex ? shell.textPrim : shell.textSec
+                                            font.pixelSize: 12
+                                        }
+
+                                        MouseArea {
+                                            id: closeHover
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: shell.closeEditorFile(index)
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: tabMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: shell.selectEditorFile(index)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
                     height: 36
                     color: "#161a20"
                     border.color: shell.border
@@ -177,7 +343,7 @@ Item {
 
                 CodeEditor {
                     width: parent.width
-                    height: parent.height - 36
+                    height: parent.height - 74
                     fileName: shell.selectedFileName
                     filePath: shell.selectedFilePath
                     content: shell.selectedFilePath.length > 0 ? shell.selectedFileContent : ""
@@ -259,7 +425,11 @@ Item {
 
                 DashboardPage { palette: shell }
                 AgentsPage    { palette: shell }
-                ChatPage      { palette: shell }
+                ChatPage {
+                    palette: shell
+                    currentFilePath: shell.selectedFilePath
+                    currentFileContent: shell.selectedFileContent
+                }
                 ToolsPage     { palette: shell }
                 SettingsPage  { palette: shell }
             }

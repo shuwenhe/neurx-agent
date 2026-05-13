@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QString>
 #include <QVariantList>
+#include "agent/CodexAgent.h"
 #include "runtime/AgentRuntime.h"
 #include "llm/LlmClient.h"
 
@@ -36,7 +37,13 @@ public slots:
     Q_INVOKABLE void startRuntime();
     Q_INVOKABLE void shutdownRuntime();
     Q_INVOKABLE void refreshLocalModels();
-    Q_INVOKABLE void sendChatMessage(const QString &modelId, const QString &text);
+    Q_INVOKABLE void sendChatMessage(const QString &modelId,
+                                     const QString &text,
+                                     const QString &currentFilePath = {},
+                                     const QString &currentFileContent = {},
+                                     const QString &effort = QStringLiteral("Medium"),
+                                     const QString &permissions = QStringLiteral("Default permissions"),
+                                     bool ideContext = true);
     Q_INVOKABLE void clearChatContext();
     Q_INVOKABLE QString readLocalFile(const QString &filePath);
     Q_INVOKABLE QString lastOpenedEditorFile() const;
@@ -58,15 +65,15 @@ private:
     QString resolveOllamaExecutable() const;
     QVariantList detectOllamaModels() const;
     QString resolveEndpointForModel(const QString &modelId) const;
+    LlmConfig buildLlmConfig(const QString &modelId) const;
 
     AgentRuntime     *m_runtime;
+    CodexAgent       *m_codexAgent{nullptr};
     QVariantList      m_localModels;
     QString           m_localModelStatus;
     QString           m_localModelSource;
     QString           m_chatApiKey;
     QString           m_chatEndpoint;
-    LlmClient        *m_chatClient{nullptr};
-    QList<LlmMessage> m_chatContext;
 };
 
 } // namespace neurx
