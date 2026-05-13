@@ -53,11 +53,11 @@ Item {
     property int slashPickerIndex: 0
     property int waitingHintIndex: 0
     property int waitingDotPhase: 0
+    property bool streamCursorOn: true
     readonly property var waitingHints: [
-        qsTr("Thinking"),
-        qsTr("Analyzing request"),
-        qsTr("Reading workspace context"),
-        qsTr("Planning response")
+        qsTr("Loading"),
+        qsTr("Analyzing"),
+        qsTr("Generating")
     ]
 
     // Slash command definitions
@@ -174,6 +174,7 @@ Item {
         })
         page.pendingMsgIdx = chatHistory.count - 1
         page.pendingContent = ""
+        page.streamCursorOn = true
         page.waitingHintIndex = 0
         page.waitingDotPhase = 0
         page.isWaiting = true
@@ -193,7 +194,7 @@ Item {
     function currentWaitingHint() {
         const dots = page.waitingDotPhase === 0 ? "." : (page.waitingDotPhase === 1 ? ".." : "...")
         if (page.currentToolRunning && page.currentToolName.length > 0)
-            return qsTr("Running tool") + ": " + page.currentToolName.replace("codex_", "") + dots
+            return qsTr("Running") + ": " + page.currentToolName.replace("codex_", "") + dots
         return page.waitingHints[page.waitingHintIndex] + dots
     }
 
@@ -201,6 +202,12 @@ Item {
         if (!page.isWaiting || page.pendingMsgIdx < 0 || page.pendingContent.length > 0)
             return
         chatHistory.setProperty(page.pendingMsgIdx, "content", page.currentWaitingHint())
+    }
+
+    function renderStreamingContent() {
+        if (page.pendingContent.length === 0)
+            return page.currentWaitingHint()
+        return page.pendingContent + (page.streamCursorOn ? "|" : "")
     }
 
     function analyzeCurrentEditorFile() {
@@ -848,8 +855,8 @@ Item {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: page.currentToolRunning ? 32 : 0
-            visible: page.currentToolRunning
+            Layout.preferredHeight: page.isWaiting ? 32 : 0
+            visible: page.isWaiting
             color: "#1a2a1f"
             border.color: "#2f6b3a"
             clip: true
@@ -860,13 +867,13 @@ Item {
                 spacing: 8
 
                 Text {
-                    text: "🔧"
+                    text: page.currentToolRunning ? "🔧" : "⏳"
                     font.pixelSize: 12
                 }
 
                 Text {
                     Layout.fillWidth: true
-                    text: page.currentToolName.replace("codex_", "")
+                    text: page.currentWaitingHint()
                     color: page.palette.textPrim
                     font { pixelSize: 11; weight: Font.Medium }
                     elide: Text.ElideRight
@@ -879,7 +886,9 @@ Item {
                     radius: 2
 
                     Rectangle {
-                        width: parent.width * (page.currentToolIteration / page.maxToolIterations)
+                        width: page.currentToolRunning
+                             ? parent.width * (page.currentToolIteration / Math.max(1, page.maxToolIterations))
+                             : parent.width * ((page.waitingDotPhase + 1) / 3)
                         height: parent.height
                         color: "#4ade80"
                         radius: 2
@@ -888,7 +897,9 @@ Item {
                 }
 
                 Text {
-                    text: page.currentToolIteration + "/" + page.maxToolIterations
+                    text: page.currentToolRunning
+                        ? (page.currentToolIteration + "/" + page.maxToolIterations)
+                        : qsTr("wait")
                     color: page.palette.textSec
                     font.pixelSize: 10
                     Layout.preferredWidth: 30
@@ -1490,7 +1501,7 @@ Item {
         function onChatChunkReceived(delta) {
             page.pendingContent += delta
             if (page.pendingMsgIdx >= 0) {
-                chatHistory.setProperty(page.pendingMsgIdx, "content", page.pendingContent)
+                chatHistory.setProperty(page.pendingMsgIdx, "content", page.renderStreamingContent())
                 page.scrollToLatest()
             }
         }
@@ -1507,6 +1518,7 @@ Item {
             }
             page.pendingMsgIdx = -1
             page.pendingContent = ""
+            page.streamCursorOn = true
             page.isWaiting = false
 
             if (approval) {
@@ -1564,6 +1576,7 @@ Item {
             }
             page.pendingMsgIdx = -1
             page.pendingContent = ""
+            page.streamCursorOn = true
             page.isWaiting = false
             page.currentToolRunning = false
         }
@@ -1599,6 +1612,7 @@ Item {
             }
             page.pendingMsgIdx = -1
             page.pendingContent = ""
+            page.streamCursorOn = true
         }
     }
 
@@ -1622,6 +1636,19 @@ Item {
             if (!page.currentToolRunning)
                 page.waitingHintIndex = (page.waitingHintIndex + 1) % page.waitingHints.length
             page.refreshWaitingHint()
+        }
+    }
+
+    Timer {
+        id: streamCursorTimer
+        interval: 380
+        repeat: true
+        running: page.isWaiting && page.pendingContent.length > 0
+        onTriggered: {
+            if (!page.isWaiting || page.pendingMsgIdx < 0 || page.pendingContent.length === 0)
+                return
+            page.streamCursorOn = !page.streamCursorOn
+            chatHistory.setProperty(page.pendingMsgIdx, "content", page.renderStreamingContent())
         }
     }
 
