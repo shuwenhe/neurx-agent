@@ -41,7 +41,7 @@ Item {
             StackLayout {
                 id: pageStack
                 anchors.fill: parent
-                currentIndex: 0
+                currentIndex: 2
 
                 DashboardPage { palette: shell }
                 AgentsPage    { palette: shell }

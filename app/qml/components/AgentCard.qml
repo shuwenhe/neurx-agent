@@ -23,7 +23,7 @@ Rectangle {
             Layout.fillWidth: true
             Text {
                 text: card.name
-                font { family: "Inter"; pixelSize: 15; weight: Font.Medium }
+                font { family: "Sans Serif"; pixelSize: 15; weight: Font.Medium }
                 color: "#f0f0f0"
                 Layout.fillWidth: true
                 elide: Text.ElideRight
@@ -33,13 +33,13 @@ Rectangle {
 
         Text {
             text: card.statusLabels[card.status] ?? "Unknown"
-            font { family: "Inter"; pixelSize: 12 }
+            font { family: "Sans Serif"; pixelSize: 12 }
             color: card.statusColors[card.status] ?? "#9a9a9a"
         }
 
         Text {
             text: card.agentId
-            font { family: "Inter"; pixelSize: 10 }
+            font { family: "Sans Serif"; pixelSize: 10 }
             color: "#555"
             elide: Text.ElideRight
             Layout.fillWidth: true

@@ -12,7 +12,7 @@ Item {
 
         Text {
             text: qsTr("Dashboard")
-            font { family: "Inter"; pixelSize: 28; weight: Font.Bold }
+            font { family: "Sans Serif"; pixelSize: 28; weight: Font.Bold }
             color: page.palette.textPrim
         }
 
@@ -35,7 +35,7 @@ Item {
         // Log console
         Text {
             text: qsTr("Live Log")
-            font { family: "Inter"; pixelSize: 16; weight: Font.Medium }
+            font { family: "Sans Serif"; pixelSize: 16; weight: Font.Medium }
             color: page.palette.textPrim
         }
 
@@ -106,13 +106,13 @@ Item {
             spacing: 6
             Text {
                 text: parent.parent.value.toString()
-                font { family: "Inter"; pixelSize: 32; weight: Font.Bold }
+                font { family: "Sans Serif"; pixelSize: 32; weight: Font.Bold }
                 color: parent.parent.accent
                 anchors.horizontalCenter: parent.horizontalCenter
             }
             Text {
                 text: parent.parent.label
-                font { family: "Inter"; pixelSize: 13 }
+                font { family: "Sans Serif"; pixelSize: 13 }
                 color: "#9a9a9a"
                 anchors.horizontalCenter: parent.horizontalCenter
             }

@@ -50,14 +50,14 @@ Item {
                     anchors { fill: parent; margins: 12 }
                     text: bubble.content
                     wrapMode: Text.WordWrap
-                    font { family: "Inter"; pixelSize: 14 }
+                    font { family: "Sans Serif"; pixelSize: 14 }
                     color: "#f0f0f0"
                 }
             }
 
             Text {
                 text: bubble.time
-                font { family: "Inter"; pixelSize: 10 }
+                font { family: "Sans Serif"; pixelSize: 10 }
                 color: "#666"
                 anchors.right: bubble.isUser ? parent.right : undefined
             }

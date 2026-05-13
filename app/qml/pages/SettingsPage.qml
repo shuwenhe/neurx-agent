@@ -12,7 +12,7 @@ Item {
 
         Text {
             text: qsTr("Settings")
-            font { family: "Inter"; pixelSize: 28; weight: Font.Bold }
+            font { family: "Sans Serif"; pixelSize: 28; weight: Font.Bold }
             color: page.palette.textPrim
         }
 
@@ -40,7 +40,7 @@ Item {
             Layout.fillWidth: true
             Text {
                 text: qsTr("Auto-start runtime")
-                font { family: "Inter"; pixelSize: 14 }
+                font { family: "Sans Serif"; pixelSize: 14 }
                 color: page.palette.textPrim
                 Layout.fillWidth: true
             }
@@ -54,7 +54,7 @@ Item {
 
     // ---------- inline components ----------
     component SectionLabel: Text {
-        font { family: "Inter"; pixelSize: 13; weight: Font.Medium }
+        font { family: "Sans Serif"; pixelSize: 13; weight: Font.Medium }
         color: page.palette.accent
         topPadding: 12
     }
@@ -69,7 +69,7 @@ Item {
 
         Text {
             text: parent.label
-            font { family: "Inter"; pixelSize: 14 }
+            font { family: "Sans Serif"; pixelSize: 14 }
             color: page.palette.textPrim
             Layout.preferredWidth: 140
         }
@@ -84,7 +84,7 @@ Item {
             TextField {
                 anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                 verticalAlignment: TextInput.AlignVCenter
-                font { family: "Inter"; pixelSize: 14 }
+                font { family: "Sans Serif"; pixelSize: 14 }
                 color: page.palette.textPrim
                 placeholderText: parent.parent.placeholder
                 echoMode: parent.parent.echoMode
