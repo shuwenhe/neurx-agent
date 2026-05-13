@@ -51,6 +51,14 @@ Item {
     property bool slashPickerOpen: false
     property string slashQuery: ""
     property int slashPickerIndex: 0
+    property int waitingHintIndex: 0
+    property int waitingDotPhase: 0
+    readonly property var waitingHints: [
+        qsTr("Thinking"),
+        qsTr("Analyzing request"),
+        qsTr("Reading workspace context"),
+        qsTr("Planning response")
+    ]
 
     // Slash command definitions
     readonly property var slashCommands: [
@@ -161,11 +169,13 @@ Item {
 
         chatHistory.append({
             role: "assistant",
-            content: "●●●",
+            content: page.currentWaitingHint(),
             time: ""
         })
         page.pendingMsgIdx = chatHistory.count - 1
         page.pendingContent = ""
+        page.waitingHintIndex = 0
+        page.waitingDotPhase = 0
         page.isWaiting = true
         page.lastUserPrompt = text
 
@@ -178,6 +188,19 @@ Item {
             page.selectedPermissions,
             page.ideContextEnabled,
             page.workLocally)
+    }
+
+    function currentWaitingHint() {
+        const dots = page.waitingDotPhase === 0 ? "." : (page.waitingDotPhase === 1 ? ".." : "...")
+        if (page.currentToolRunning && page.currentToolName.length > 0)
+            return qsTr("Running tool") + ": " + page.currentToolName.replace("codex_", "") + dots
+        return page.waitingHints[page.waitingHintIndex] + dots
+    }
+
+    function refreshWaitingHint() {
+        if (!page.isWaiting || page.pendingMsgIdx < 0 || page.pendingContent.length > 0)
+            return
+        chatHistory.setProperty(page.pendingMsgIdx, "content", page.currentWaitingHint())
     }
 
     function analyzeCurrentEditorFile() {
@@ -1550,10 +1573,12 @@ Item {
             page.currentToolIteration = iteration
             page.maxToolIterations = maxIterations
             page.currentToolRunning = true
+            page.refreshWaitingHint()
         }
 
         function onToolExecutionFinished(toolName, success) {
             page.currentToolRunning = false
+            page.refreshWaitingHint()
         }
 
         function onOperationSummaryReady(summary) {
@@ -1568,7 +1593,7 @@ Item {
             page.currentToolName = ""
             if (page.pendingMsgIdx >= 0) {
                 const current = chatHistory.get(page.pendingMsgIdx).content
-                const stopped = current === "●●●" ? qsTr("(stopped)") : current + qsTr(" _(stopped)_")
+                const stopped = page.pendingContent.length === 0 ? qsTr("(stopped)") : current + qsTr(" _(stopped)_")
                 chatHistory.setProperty(page.pendingMsgIdx, "content", stopped)
                 chatHistory.setProperty(page.pendingMsgIdx, "time", Qt.formatTime(new Date(), "hh:mm"))
             }
@@ -1582,6 +1607,22 @@ Item {
         interval: 5000
         repeat: false
         onTriggered: page.showOperationSummary = false
+    }
+
+    Timer {
+        id: waitingHintTimer
+        interval: 650
+        repeat: true
+        running: page.isWaiting
+        onTriggered: {
+            if (!page.isWaiting || page.pendingMsgIdx < 0 || page.pendingContent.length > 0)
+                return
+
+            page.waitingDotPhase = (page.waitingDotPhase + 1) % 3
+            if (!page.currentToolRunning)
+                page.waitingHintIndex = (page.waitingHintIndex + 1) % page.waitingHints.length
+            page.refreshWaitingHint()
+        }
     }
 
     // Slash command picker popup (anchored above the composer)
