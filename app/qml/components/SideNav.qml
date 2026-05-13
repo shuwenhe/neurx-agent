@@ -11,6 +11,7 @@ Rectangle {
     required property int currentIndex
     property string explorerRoot: "/Users/feifei"
     signal pageRequested(int index)
+    signal fileRequested(string filePath, string fileName)
 
     readonly property var pages: [
         { icon: "⌂", label: qsTr("Dashboard") },
@@ -117,6 +118,8 @@ Rectangle {
                             isDir: true
                             depth: 0
                             expanded: true
+                            onFileActivated: (selectedPath, selectedName) =>
+                                nav.fileRequested(selectedPath, selectedName)
                         }
                     }
                 }

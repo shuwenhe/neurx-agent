@@ -38,6 +38,7 @@ public slots:
     Q_INVOKABLE void refreshLocalModels();
     Q_INVOKABLE void sendChatMessage(const QString &modelId, const QString &text);
     Q_INVOKABLE void clearChatContext();
+    Q_INVOKABLE QString readLocalFile(const QString &filePath);
 
 signals:
     void runningChanged(bool running);

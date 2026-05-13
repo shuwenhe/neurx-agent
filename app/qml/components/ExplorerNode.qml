@@ -9,6 +9,7 @@ Column {
     property bool   isDir: false
     property int    depth: 0
     property bool expanded: false
+    signal fileActivated(string filePath, string fileName)
 
     width: parent ? parent.width : 240
 
@@ -75,10 +76,12 @@ Column {
             id: rowMouse
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: node.isDir ? Qt.PointingHandCursor : Qt.ArrowCursor
+            cursorShape: Qt.PointingHandCursor
             onClicked: {
                 if (node.isDir)
                     node.expanded = !node.expanded
+                else
+                    node.fileActivated(node.path, node.name)
             }
         }
     }
@@ -96,6 +99,9 @@ Column {
             item.parentPath = node.path
             item.depth = node.depth + 1
             item.showHidden = false
+            item.fileActivated.connect(function(filePath, fileName) {
+                node.fileActivated(filePath, fileName)
+            })
         }
     }
 }

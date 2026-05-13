@@ -9,6 +9,7 @@ Column {
     property string parentPath: ""
     property int depth: 1
     property bool showHidden: false
+    signal fileActivated(string filePath, string fileName)
 
     FolderListModel {
         id: folderModel
@@ -34,6 +35,8 @@ Column {
             path: filePath
             isDir: fileIsDir
             depth: children.depth
+            onFileActivated: (selectedPath, selectedName) =>
+                children.fileActivated(selectedPath, selectedName)
         }
     }
 }

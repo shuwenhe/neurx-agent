@@ -1,5 +1,6 @@
 #include "RuntimeBridge.h"
 
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
@@ -103,6 +104,27 @@ void RuntimeBridge::sendChatMessage(const QString &modelId, const QString &text)
 void RuntimeBridge::clearChatContext()
 {
     m_chatContext.clear();
+}
+
+QString RuntimeBridge::readLocalFile(const QString &filePath)
+{
+    QFile file(filePath);
+    if (!file.exists())
+        return QStringLiteral("Unable to open file: not found");
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QStringLiteral("Unable to open file: %1").arg(file.errorString());
+
+    static constexpr qint64 kMaxPreviewBytes = 512 * 1024;
+    QByteArray bytes = file.read(kMaxPreviewBytes + 1);
+    bool truncated = bytes.size() > kMaxPreviewBytes;
+    if (truncated)
+        bytes.truncate(kMaxPreviewBytes);
+
+    QString content = QString::fromUtf8(bytes);
+    if (truncated)
+        content.append(QStringLiteral("\n\n... [preview truncated]") );
+    return content;
 }
 
 void RuntimeBridge::refreshLocalModels()
