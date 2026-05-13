@@ -9,6 +9,10 @@
 
 namespace neurx {
 
+namespace {
+constexpr int kRequestTimeoutMs = 120000;
+}
+
 LlmClient::LlmClient(const LlmConfig &config, QObject *parent)
     : QObject(parent)
     , m_config(config)
@@ -69,7 +73,7 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
     // Shared flag so the timer and finished handler don't both emit.
     auto emitted = std::make_shared<bool>(false);
 
-    // Abort and report error if the server doesn't respond within 30 seconds.
+    // Abort and report error if the server doesn't respond within the timeout.
     auto *timer = new QTimer(reply);
     timer->setSingleShot(true);
     connect(timer, &QTimer::timeout, this, [this, reply, emitted]() {
@@ -78,18 +82,22 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
             if (!*emitted) {
                 *emitted = true;
                 emit errorOccurred(QStringLiteral(
-                    "Request timed out (30s). Check your network and API key."));
+                    "Request timed out (120s). Check your model service, network, and API key."));
             }
         }
     });
-    timer->start(30000);
+    timer->start(kRequestTimeoutMs);
 
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, messages, tools, emitted]() {
         if (m_activeReply == reply)
             m_activeReply = nullptr;
         const bool ignored = m_ignoredReplies.remove(reply) > 0;
-        if (*emitted || ignored || reply->error() == QNetworkReply::OperationCanceledError) {
+        if (ignored || reply->error() == QNetworkReply::OperationCanceledError) {
+            reply->deleteLater();
+            return;
+        }
+        if (*emitted) {
             reply->deleteLater();
             return;
         }

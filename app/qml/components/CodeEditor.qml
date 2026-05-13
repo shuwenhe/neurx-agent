@@ -342,15 +342,20 @@ Rectangle {
             id: codeText
             x: editor.gutterWidth + 14
             y: 12
-            text: editor.highlightedHtml()
-            textFormat: TextEdit.RichText
-            readOnly: true
+            text: editor.content
+            textFormat: TextEdit.PlainText
+            readOnly: false
             selectByMouse: true
             persistentSelection: true
             wrapMode: TextEdit.NoWrap
-            cursorVisible: false
+            cursorVisible: true
+            color: editor.textColor
             font { family: "Menlo"; pixelSize: editor.fontSize }
             renderType: Text.NativeRendering
+            
+            onTextChanged: {
+                editor.content = text
+            }
         }
 
         MouseArea {
@@ -370,10 +375,23 @@ Rectangle {
             id: editorContextMenu
 
             MenuItem {
+                text: qsTr("Cut")
+                enabled: codeText.selectedText.length > 0
+                onTriggered: codeText.cut()
+            }
+
+            MenuItem {
                 text: qsTr("Copy")
                 enabled: codeText.selectedText.length > 0
                 onTriggered: codeText.copy()
             }
+
+            MenuItem {
+                text: qsTr("Paste")
+                onTriggered: codeText.paste()
+            }
+
+            MenuSeparator {}
 
             MenuItem {
                 text: qsTr("Copy Path")
