@@ -11,7 +11,8 @@ Column {
     property int    depth: 0
     property bool expanded: false
     property string focusPath: ""
-    property Item scrollTarget: null
+    property int focusRequest: 0
+    property Flickable scrollTarget: null
     signal fileActivated(string filePath, string fileName)
 
     width: parent ? parent.width : 240
@@ -26,7 +27,7 @@ Column {
             node.expanded = true
 
         if (node.isFocusedFile)
-            Qt.callLater(node.scrollIntoView)
+            node.scheduleScrollIntoView()
     }
 
     function scrollIntoView() {
@@ -44,6 +45,11 @@ Column {
         }
     }
 
+    function scheduleScrollIntoView() {
+        scrollRetryTimer.remainingAttempts = 8
+        scrollRetryTimer.restart()
+    }
+
     function openContextMenu(mouseX) {
         fileContextMenu.targetPath = node.path
         fileContextMenu.targetName = node.name
@@ -56,6 +62,26 @@ Column {
     Component.onCompleted: syncFocusState()
     onFocusPathChanged: syncFocusState()
     onIsFocusedFileChanged: syncFocusState()
+    onIsFocusedAncestorChanged: syncFocusState()
+    onFocusRequestChanged: syncFocusState()
+    onExpandedChanged: {
+        if (node.isFocusedAncestor || node.isFocusedFile)
+            Qt.callLater(node.syncFocusState)
+    }
+
+    Timer {
+        id: scrollRetryTimer
+        interval: 35
+        repeat: true
+        property int remainingAttempts: 0
+
+        onTriggered: {
+            node.scrollIntoView()
+            remainingAttempts -= 1
+            if (remainingAttempts <= 0)
+                stop()
+        }
+    }
 
     function fileIcon(fileName) {
         const lower = fileName.toLowerCase()
@@ -177,10 +203,12 @@ Column {
             item.depth = node.depth + 1
             item.showHidden = false
             item.focusPath = Qt.binding(function() { return node.focusPath })
+            item.focusRequest = Qt.binding(function() { return node.focusRequest })
             item.scrollTarget = Qt.binding(function() { return node.scrollTarget })
             item.fileActivated.connect(function(filePath, fileName) {
                 node.fileActivated(filePath, fileName)
             })
+            Qt.callLater(node.syncFocusState)
         }
     }
 }

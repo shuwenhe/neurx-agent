@@ -7,9 +7,18 @@ qt_add_executable(neurx_app
     bridge/LogModel.cpp
 )
 
+set(NEURX_QML_IMPORTS)
+if(Qt6WebEngineQuick_FOUND AND Qt6WebChannelQuick_FOUND)
+    list(APPEND NEURX_QML_IMPORTS
+        QtWebEngine
+        QtWebChannel
+    )
+endif()
+
 qt_add_qml_module(neurx_app
     URI neurx
     VERSION 1.0
+    IMPORTS ${NEURX_QML_IMPORTS}
     QML_FILES
         qml/Main.qml
         qml/AppShell.qml
@@ -39,6 +48,14 @@ target_link_libraries(neurx_app PRIVATE
     Qt6::QuickControls2
     Qt6::Gui
 )
+
+if(Qt6WebEngineQuick_FOUND AND Qt6WebChannelQuick_FOUND)
+    target_link_libraries(neurx_app PRIVATE
+        Qt6::WebEngineQuick
+        Qt6::WebChannelQuick
+    )
+    target_compile_definitions(neurx_app PRIVATE NEURX_HAS_WEBENGINEQUICK)
+endif()
 
 # ------------- Android -------------
 if(ANDROID)

@@ -6,6 +6,7 @@ target_sources(neurx_plugins PRIVATE
     PluginLoader.cpp
     # Built-in plugins
     builtin/WebSearchTool.cpp
+    builtin/CodexWorkspaceTool.cpp
     builtin/ReActAgent.cpp
 )
 

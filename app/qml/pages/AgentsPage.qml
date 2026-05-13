@@ -39,9 +39,6 @@ Item {
             delegate: AgentCard {
                 width: grid.cellWidth - 16
                 height: grid.cellHeight - 16
-                agentId: model.agentId
-                name:    model.name
-                status:  model.status
             }
         }
 

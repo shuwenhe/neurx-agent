@@ -1,15 +1,46 @@
 #include <QGuiApplication>
+#include <QByteArray>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+
+#ifdef NEURX_HAS_WEBENGINEQUICK
+#include <QtWebEngineQuick/qtwebenginequickglobal.h>
+#endif
 
 #include "runtime/AgentRuntime.h"
 #include "bridge/RuntimeBridge.h"
 #include "bridge/AgentListModel.h"
 #include "bridge/LogModel.h"
 
+namespace {
+
+void enableWebContentsAutoDarkMode()
+{
+#ifdef NEURX_HAS_WEBENGINEQUICK
+    constexpr auto kAutoDarkFlag = "--enable-features=WebContentsForceDark";
+    const QByteArray existingFlags = qgetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+    if (existingFlags.contains(kAutoDarkFlag))
+        return;
+
+    QByteArray flags = existingFlags.trimmed();
+    if (!flags.isEmpty())
+        flags.append(' ');
+    flags.append(kAutoDarkFlag);
+    qputenv("QTWEBENGINE_CHROMIUM_FLAGS", flags);
+#endif
+}
+
+} // namespace
+
 int main(int argc, char *argv[])
 {
+    enableWebContentsAutoDarkMode();
+
+#ifdef NEURX_HAS_WEBENGINEQUICK
+    QtWebEngineQuick::initialize();
+#endif
+
     QGuiApplication app(argc, argv);
     app.setApplicationName("NeurX");
     app.setApplicationVersion(QStringLiteral("%1.%2.%3")

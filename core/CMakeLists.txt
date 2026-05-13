@@ -13,6 +13,8 @@ target_sources(neurx_core PRIVATE
     runtime/AgentRuntime.cpp
     runtime/TaskScheduler.cpp
     runtime/EventBus.cpp
+    runtime/WorkspaceContext.cpp
+    runtime/ErrorRecovery.cpp
     # Tool system
     tools/ToolRegistry.cpp
     tools/BaseTool.cpp

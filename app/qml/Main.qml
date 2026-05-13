@@ -19,7 +19,7 @@ Window {
     }
 
     Shortcut {
-        sequence: StandardKey.Close
+        sequences: [ StandardKey.Close ]
         onActivated: shellView.closeCurrentEditor()
     }
 }

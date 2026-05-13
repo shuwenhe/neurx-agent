@@ -33,9 +33,12 @@ QVariantList ToolRegistry::toolSchemas() const
     QVariantList schemas;
     for (const auto *tool : m_tools) {
         schemas.append(QVariantMap{
-            {"name",        tool->toolId()},
-            {"description", tool->description()},
-            {"parameters",  tool->inputSchema()}
+            {"type", QStringLiteral("function")},
+            {"function", QVariantMap{
+                {"name",        tool->toolId()},
+                {"description", tool->description()},
+                {"parameters",  tool->inputSchema()}
+            }}
         });
     }
     return schemas;

@@ -26,12 +26,20 @@ find_package(Qt6 REQUIRED COMPONENTS
     Sql
     Qml
 )
-# WebSockets is optional — install via Qt Maintenance Tool if needed
+# Optional components
 find_package(Qt6 OPTIONAL_COMPONENTS WebSockets)
+find_package(Qt6WebEngineQuick)
+find_package(Qt6WebChannelQuick)
+
 if(Qt6WebSockets_FOUND)
     message(STATUS "Qt6 WebSockets: found")
 else()
     message(WARNING "Qt6 WebSockets not found — WebSocket features disabled")
+endif()
+if(Qt6WebEngineQuick_FOUND AND Qt6WebChannelQuick_FOUND)
+    message(STATUS "Qt6 WebEngineQuick/WebChannelQuick: found")
+else()
+    message(WARNING "Qt6 WebEngineQuick or Qt6 WebChannelQuick not available — embedded web rendering disabled. Install Qt WebEngine and Qt WebChannel for this Qt kit.")
 endif()
 
 qt_standard_project_setup(REQUIRES 6.5)

@@ -1,9 +1,11 @@
 #pragma once
 #include <QObject>
 #include <QString>
+#include <QVariantList>
 #include <QVariantMap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QPointer>
 #include <functional>
 
 namespace neurx {
@@ -21,6 +23,9 @@ struct LlmMessage
 {
     QString role;    // "system" | "user" | "assistant" | "tool"
     QString content;
+    QString name;
+    QString toolCallId;
+    QVariantList toolCalls;
 };
 
 /// Async LLM client supporting OpenAI-compatible APIs.
@@ -33,6 +38,9 @@ public:
 
     void setConfig(const LlmConfig &config);
     const LlmConfig &config() const { return m_config; }
+
+    /// Abort any in-flight request immediately.
+    void abort();
 
     /// Send a chat completion request (non-streaming).
     void chat(const QList<LlmMessage> &messages,
@@ -56,6 +64,7 @@ private:
 
     LlmConfig              m_config;
     QNetworkAccessManager *m_nam;
+    QPointer<QNetworkReply> m_activeReply;
 };
 
 } // namespace neurx

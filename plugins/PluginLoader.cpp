@@ -1,5 +1,6 @@
 #include "PluginLoader.h"
 #include "builtin/WebSearchTool.h"
+#include "builtin/CodexWorkspaceTool.h"
 #include "builtin/ReActAgent.h"
 #include "../core/tools/ToolRegistry.h"
 #include "../core/agent/AgentRegistry.h"
@@ -32,6 +33,14 @@ void PluginLoader::registerBuiltins()
     tools.registerTool(new FileSystemTool);
     tools.registerTool(new ShellTool);
     tools.registerTool(new HttpTool);
+    tools.registerTool(new CodexReadFileTool);
+    tools.registerTool(new CodexSearchWorkspaceTool);
+    tools.registerTool(new CodexRunCommandTool);
+    tools.registerTool(new CodexProposePatchTool);
+    tools.registerTool(new CodexCreateFileTool);
+    tools.registerTool(new CodexEditFileTool);
+    tools.registerTool(new CodexFindSymbolTool);
+    tools.registerTool(new CodexFindReferencesTool);
 
     auto &agents = AgentRegistry::instance();
     agents.registerAgent(new ReActAgent("ReAct-1"));

@@ -35,6 +35,8 @@ Item {
         SettingRow {
             label: qsTr("Default Model")
             placeholder: "gpt-4o"
+            initialValue: Runtime.chatModel
+            onValueChanged: (v) => Runtime.chatModel = v
         }
 
         // Runtime section

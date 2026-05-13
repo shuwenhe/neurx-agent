@@ -6,6 +6,9 @@ import QtQuick.Controls.Basic
 Rectangle {
     id: editor
 
+    signal webUrlChanged(string url)
+    signal webNewTabRequested(string url)
+
     property string fileName: ""
     property string filePath: ""
     property string content: ""
@@ -21,6 +24,116 @@ Rectangle {
     readonly property int fontSize: 13
     readonly property int lineCount: Math.max(1, content.length === 0 ? 1 : content.split("\n").length)
     readonly property int gutterWidth: Math.max(48, 24 + lineCount.toString().length * 8)
+    readonly property bool isWebTarget: filePath.toLowerCase().indexOf("http://") === 0
+                                     || filePath.toLowerCase().indexOf("https://") === 0
+
+    property var webViewObject: null
+    property string webViewError: ""
+    property bool webCanGoBack: false
+    property bool webCanGoForward: false
+    property bool webLoading: false
+    property string webCurrentUrl: ""
+    property bool webAddressEditing: false
+
+    function ensureWebView() {
+        if (!isWebTarget) {
+            if (webViewObject) {
+                webViewObject.destroy()
+                webViewObject = null
+            }
+            webViewError = ""
+            webCanGoBack = false
+            webCanGoForward = false
+            webLoading = false
+            webCurrentUrl = ""
+            return
+        }
+
+        if (!webViewObject) {
+            try {
+                webViewObject = Qt.createQmlObject(
+                    "import QtQuick; import QtWebEngine; import QtWebChannel; WebEngineView { anchors.fill: parent; anchors.topMargin: 34; backgroundColor: '#0f1115'; settings.forceDarkMode: true; onUrlChanged: editor.onDynamicUrlChanged(url.toString()); onNewWindowRequested: function(request) { editor.onDynamicNewWindowRequested(request.requestedUrl.toString()) } }",
+                    webContainer,
+                    "dynamicWebView")
+                webViewError = ""
+            } catch (err) {
+                webViewError = qsTr("Web rendering is unavailable. Please install Qt WebEngine and Qt WebChannel for this Qt kit.")
+                webViewObject = null
+                return
+            }
+        }
+
+        if (webViewObject)
+            webViewObject.url = filePath
+    }
+
+    function onDynamicUrlChanged(urlText) {
+        if (!urlText || urlText.length === 0)
+            return
+        webCurrentUrl = urlText
+        webUrlChanged(urlText)
+    }
+
+    function onDynamicNewWindowRequested(urlText) {
+        const target = normalizeWebUrl(urlText || "")
+        if (!target)
+            return
+        webNewTabRequested(target)
+    }
+
+    function syncWebState() {
+        if (!webViewObject)
+            return
+        webCanGoBack = !!webViewObject.canGoBack
+        webCanGoForward = !!webViewObject.canGoForward
+        webLoading = !!webViewObject.loading
+        webCurrentUrl = webViewObject.url ? webViewObject.url.toString() : ""
+        if (webAddressField && !webAddressField.activeFocus)
+            webAddressField.text = webCurrentUrl.length > 0 ? webCurrentUrl : filePath
+    }
+
+    function webGoBack() {
+        if (webViewObject && webCanGoBack)
+            webViewObject.goBack()
+    }
+
+    function webGoForward() {
+        if (webViewObject && webCanGoForward)
+            webViewObject.goForward()
+    }
+
+    function webReload() {
+        if (webViewObject)
+            webViewObject.reload()
+    }
+
+    function normalizeWebUrl(value) {
+        const text = (value || "").trim()
+        if (!text)
+            return ""
+        if (text.toLowerCase().indexOf("http://") === 0 || text.toLowerCase().indexOf("https://") === 0)
+            return text
+        return "https://" + text
+    }
+
+    function navigateWebUrl(value) {
+        const target = normalizeWebUrl(value)
+        if (!target || !webViewObject)
+            return
+        webViewObject.url = target
+        webAddressField.text = target
+    }
+
+    onIsWebTargetChanged: ensureWebView()
+    onFilePathChanged: ensureWebView()
+    Component.onCompleted: ensureWebView()
+
+    Timer {
+        interval: 150
+        repeat: true
+        running: editor.isWebTarget && editor.webViewObject !== null
+        onTriggered: editor.syncWebState()
+    }
 
     function escapeHtml(value) {
         return value.replace(/&/g, "&amp;")
@@ -187,6 +300,7 @@ Rectangle {
     Flickable {
         id: scroll
         anchors.fill: parent
+        visible: !editor.isWebTarget
         clip: true
         contentWidth: Math.max(width, codeText.contentWidth + editor.gutterWidth + 32)
         contentHeight: Math.max(height, codeText.contentHeight + 24)
@@ -280,15 +394,145 @@ Rectangle {
         }
 
         Shortcut {
-            sequence: StandardKey.Copy
+            sequences: [ StandardKey.Copy ]
             enabled: codeText.activeFocus
             onActivated: codeText.copy()
         }
 
         Shortcut {
-            sequence: StandardKey.SelectAll
+            sequences: [ StandardKey.SelectAll ]
             enabled: codeText.activeFocus
             onActivated: codeText.selectAll()
+        }
+    }
+
+    Item {
+        id: webContainer
+        anchors.fill: parent
+        visible: editor.isWebTarget
+
+        Rectangle {
+            id: webToolbar
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 34
+            color: "#10151c"
+            border.color: editor.borderColor
+
+            Row {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 8
+
+                Rectangle {
+                    width: 24
+                    height: 24
+                    radius: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: editor.webCanGoBack ? "#1f2937" : "#151a22"
+                    border.color: editor.borderColor
+                    Text { anchors.centerIn: parent; text: "<"; color: editor.webCanGoBack ? "#d1d5db" : "#6b7280"; font.pixelSize: 12 }
+                    MouseArea { anchors.fill: parent; enabled: editor.webCanGoBack; onClicked: editor.webGoBack() }
+                }
+
+                Rectangle {
+                    width: 24
+                    height: 24
+                    radius: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: editor.webCanGoForward ? "#1f2937" : "#151a22"
+                    border.color: editor.borderColor
+                    Text { anchors.centerIn: parent; text: ">"; color: editor.webCanGoForward ? "#d1d5db" : "#6b7280"; font.pixelSize: 12 }
+                    MouseArea { anchors.fill: parent; enabled: editor.webCanGoForward; onClicked: editor.webGoForward() }
+                }
+
+                Rectangle {
+                    width: 26
+                    height: 24
+                    radius: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: "#1f2937"
+                    border.color: editor.borderColor
+                    Text { anchors.centerIn: parent; text: editor.webLoading ? "..." : "R"; color: "#d1d5db"; font.pixelSize: 12 }
+                    MouseArea { anchors.fill: parent; onClicked: editor.webReload() }
+                }
+
+                Rectangle {
+                    width: 26
+                    height: 24
+                    radius: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: "#1f2937"
+                    border.color: editor.borderColor
+                    Text { anchors.centerIn: parent; text: "↗"; color: "#d1d5db"; font.pixelSize: 12 }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: Qt.openUrlExternally(editor.webCurrentUrl.length > 0 ? editor.webCurrentUrl : editor.filePath)
+                    }
+                }
+
+                TextField {
+                    id: webAddressField
+                    width: webToolbar.width - 220
+                    height: 24
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: editor.webCurrentUrl.length > 0 ? editor.webCurrentUrl : editor.filePath
+                    color: "#d1d5db"
+                    placeholderText: qsTr("Enter URL")
+                    placeholderTextColor: "#6f7b8a"
+                    selectedTextColor: "#ffffff"
+                    selectionColor: "#334155"
+                    font.pixelSize: 11
+                    leftPadding: 8
+                    rightPadding: 8
+                    background: Rectangle {
+                        radius: 4
+                        color: "#0f131a"
+                        border.color: webAddressField.activeFocus ? "#4a5c7a" : editor.borderColor
+                        border.width: 1
+                    }
+
+                    onActiveFocusChanged: {
+                        editor.webAddressEditing = activeFocus
+                        if (!activeFocus)
+                            text = editor.webCurrentUrl.length > 0 ? editor.webCurrentUrl : editor.filePath
+                    }
+
+                    onAccepted: editor.navigateWebUrl(text)
+                }
+
+                Rectangle {
+                    width: 28
+                    height: 24
+                    radius: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: "#1f2937"
+                    border.color: editor.borderColor
+                    Text { anchors.centerIn: parent; text: "→"; color: "#d1d5db"; font.pixelSize: 12 }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: editor.navigateWebUrl(webAddressField.text)
+                    }
+                }
+            }
+        }
+
+        Item {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: webToolbar.bottom
+            anchors.bottom: parent.bottom
+            clip: true
+        }
+
+        Text {
+            anchors.centerIn: parent
+            visible: editor.isWebTarget && editor.webViewError.length > 0
+            text: editor.webViewError
+            color: "#f59e0b"
+            font.pixelSize: 13
         }
     }
 }

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls.Basic
 import "components"
 import "pages"
 
@@ -14,6 +15,14 @@ Item {
     property int activeEditorIndex: -1
     property real explorerPaneWidth: 304
     property real editorPaneWidth: 560
+    property string pendingAddressTarget: ""
+    property bool pendingAddressRemember: true
+    property string addressStatusText: ""
+    property bool addressStatusIsError: false
+    property bool addressBusy: false
+    property var recentAddressTargets: []
+    property var pinnedAddressTargets: []
+    property int addressSuggestionIndex: -1
 
     readonly property real splitterWidth: 6
     readonly property real minExplorerPaneWidth: 220
@@ -36,6 +45,10 @@ Item {
         id: openFilesModel
     }
 
+    ListModel {
+        id: addressSuggestionsModel
+    }
+
     function clampPaneWidths() {
         const total = shell.width
         const fixed = splitterWidth * 2
@@ -56,6 +69,207 @@ Item {
         return parts.length > 0 ? parts[parts.length - 1] : filePath
     }
 
+    function normalizeAddressTarget(target) {
+        const value = (target || "").trim()
+        if (!value)
+            return ""
+
+        if (value.indexOf("://") > 0)
+            return value
+
+        if (value.indexOf("/") === 0)
+            return value
+
+        if (value.indexOf(".") >= 0 && value.indexOf(" ") < 0)
+            return "https://" + value
+
+        return value
+    }
+
+    function isUrlTarget(target) {
+        const value = (target || "").trim().toLowerCase()
+        return value.indexOf("http://") === 0 || value.indexOf("https://") === 0
+    }
+
+    function isLocalPathTarget(target) {
+        const value = (target || "").trim()
+        return value.length > 0 && value.indexOf("/") === 0
+    }
+
+    function canPersistPath(target) {
+        return isLocalPathTarget(target)
+    }
+
+    function isReadError(content) {
+        return String(content || "").indexOf("Unable to open") === 0
+    }
+
+    function setAddressStatus(text, isError) {
+        addressStatusText = text
+        addressStatusIsError = !!isError
+        if (text && text.length > 0)
+            clearAddressStatusTimer.restart()
+    }
+
+    function pushRecentAddressTarget(target) {
+        const normalized = normalizeAddressTarget(target)
+        if (!normalized)
+            return
+
+        const next = []
+        if (pinnedAddressTargets.indexOf(normalized) < 0)
+            next.push(normalized)
+        for (let i = 0; i < recentAddressTargets.length; ++i) {
+            const item = recentAddressTargets[i]
+            if (item !== normalized && pinnedAddressTargets.indexOf(item) < 0)
+                next.push(item)
+            if (next.length >= 20)
+                break
+        }
+        recentAddressTargets = next
+        Runtime.setAddressHistory(recentAddressTargets)
+        refreshAddressSuggestions()
+    }
+
+    function isPinnedAddressTarget(target) {
+        return pinnedAddressTargets.indexOf(target) >= 0
+    }
+
+    function togglePinnedAddressTarget(target) {
+        const normalized = normalizeAddressTarget(target)
+        if (!normalized)
+            return
+
+        const nextPinned = []
+        const existingIndex = pinnedAddressTargets.indexOf(normalized)
+        if (existingIndex >= 0) {
+            for (let i = 0; i < pinnedAddressTargets.length; ++i) {
+                if (i !== existingIndex)
+                    nextPinned.push(pinnedAddressTargets[i])
+            }
+        } else {
+            nextPinned.push(normalized)
+            for (let i = 0; i < pinnedAddressTargets.length; ++i) {
+                const item = pinnedAddressTargets[i]
+                if (item !== normalized)
+                    nextPinned.push(item)
+                if (nextPinned.length >= 20)
+                    break
+            }
+        }
+
+        pinnedAddressTargets = nextPinned
+        Runtime.setPinnedAddressHistory(pinnedAddressTargets)
+
+        const filteredRecent = []
+        for (let i = 0; i < recentAddressTargets.length; ++i) {
+            const item = recentAddressTargets[i]
+            if (pinnedAddressTargets.indexOf(item) < 0)
+                filteredRecent.push(item)
+        }
+        recentAddressTargets = filteredRecent
+        Runtime.setAddressHistory(recentAddressTargets)
+        refreshAddressSuggestions()
+    }
+
+    function clearRecentAddressTargets() {
+        recentAddressTargets = []
+        addressSuggestionsModel.clear()
+        addressSuggestionIndex = -1
+        suggestionsPopup.close()
+        Runtime.clearAddressHistory()
+        setAddressStatus(qsTr("Address history cleared"), false)
+    }
+
+    function refreshAddressSuggestions() {
+        addressSuggestionsModel.clear()
+        const query = (addressField ? addressField.text : "").trim().toLowerCase()
+
+        for (let i = 0; i < pinnedAddressTargets.length; ++i) {
+            const candidate = pinnedAddressTargets[i]
+            if (!query || candidate.toLowerCase().indexOf(query) >= 0)
+                addressSuggestionsModel.append({ value: candidate, pinned: true })
+            if (addressSuggestionsModel.count >= 8)
+                break
+        }
+
+        for (let i = 0; i < recentAddressTargets.length; ++i) {
+            const candidate = recentAddressTargets[i]
+            if (!query || candidate.toLowerCase().indexOf(query) >= 0)
+                addressSuggestionsModel.append({ value: candidate, pinned: false })
+            if (addressSuggestionsModel.count >= 8)
+                break
+        }
+
+        if (addressSuggestionsModel.count > 0) {
+            addressSuggestionIndex = Math.min(addressSuggestionIndex, addressSuggestionsModel.count - 1)
+            if (addressSuggestionIndex < 0)
+                addressSuggestionIndex = 0
+            suggestionsPopup.open()
+        } else {
+            addressSuggestionIndex = -1
+            suggestionsPopup.close()
+        }
+    }
+
+    function selectCurrentSuggestion() {
+        if (!suggestionsPopup.opened || addressSuggestionIndex < 0 || addressSuggestionIndex >= addressSuggestionsModel.count)
+            return false
+
+        const value = addressSuggestionsModel.get(addressSuggestionIndex).value
+        addressField.text = value
+        suggestionsPopup.close()
+        shell.openEditorTarget(value, true)
+        return true
+    }
+
+    function queueOpenEditorTarget(target, remember) {
+        const normalized = normalizeAddressTarget(target)
+        if (!normalized) {
+            setAddressStatus(qsTr("Enter a file path or URL"), true)
+            return
+        }
+
+        pendingAddressTarget = normalized
+        pendingAddressRemember = remember
+        addressBusy = true
+        setAddressStatus(qsTr("Opening..."), false)
+        openAddressTimer.restart()
+    }
+
+    function performOpenEditorTarget() {
+        const normalized = pendingAddressTarget
+        addressBusy = false
+        if (!normalized)
+            return
+
+        if (shell.isUrlTarget(normalized)) {
+            shell.openEditorFile(normalized, normalized, false, "")
+            pushRecentAddressTarget(normalized)
+            setAddressStatus(qsTr("Opened URL"), false)
+            return
+        }
+
+        if (!shell.isLocalPathTarget(normalized)) {
+            setAddressStatus(qsTr("Only absolute file paths and http/https URLs are supported"), true)
+            return
+        }
+
+        const localContent = Runtime.readLocalFile(normalized)
+        if (shell.isReadError(localContent)) {
+            setAddressStatus(localContent, true)
+            return
+        }
+
+        shell.openEditorFile(normalized, shell.fileNameFromPath(normalized), pendingAddressRemember, localContent)
+        pushRecentAddressTarget(normalized)
+        setAddressStatus(qsTr("Opened file"), false)
+    }
+
+    function openEditorTarget(target, remember) {
+        queueOpenEditorTarget(target, remember)
+    }
+
     function findOpenFileIndex(filePath) {
         for (let i = 0; i < openFilesModel.count; ++i) {
             if (openFilesModel.get(i).filePath === filePath)
@@ -70,6 +284,8 @@ Item {
             selectedFileName = ""
             selectedFileContent = ""
             explorerFocusPath = ""
+            if (addressField)
+                addressField.text = ""
             return
         }
 
@@ -77,11 +293,17 @@ Item {
         selectedFilePath = entry.filePath
         selectedFileName = entry.fileName
         selectedFileContent = entry.content
-        explorerFocusPath = selectedFilePath
-        explorerFocusRequest += 1
+        if (shell.isLocalPathTarget(selectedFilePath)) {
+            explorerFocusPath = selectedFilePath
+            explorerFocusRequest += 1
+        } else {
+            explorerFocusPath = ""
+        }
+        if (addressField)
+            addressField.text = selectedFilePath
     }
 
-    function openEditorFile(filePath, fileName, remember) {
+    function openEditorFile(filePath, fileName, remember, contentOverride) {
         if (!filePath || filePath.length === 0)
             return
 
@@ -94,10 +316,15 @@ Item {
             openFilesModel.append({
                 filePath: filePath,
                 fileName: resolvedName,
-                content: Runtime.readLocalFile(filePath)
+                content: contentOverride !== undefined
+                    ? contentOverride
+                    : Runtime.readLocalFile(filePath)
             })
             index = openFilesModel.count - 1
         } else {
+            if (contentOverride !== undefined)
+                openFilesModel.setProperty(index, "content", contentOverride)
+
             // Reopening an existing file makes it the newest tab on the far right.
             if (index !== openFilesModel.count - 1) {
                 openFilesModel.move(index, openFilesModel.count - 1, 1)
@@ -109,8 +336,42 @@ Item {
         shell.syncActiveEditor()
         shell.ensureNewestTabVisible()
 
-        if (remember)
+        if (remember && shell.canPersistPath(filePath))
             Runtime.rememberOpenedEditorFile(filePath)
+    }
+
+    function handleEditorWebUrlChanged(url) {
+        const normalized = (url || "").trim()
+        if (!shell.isUrlTarget(normalized))
+            return
+        if (activeEditorIndex < 0 || activeEditorIndex >= openFilesModel.count)
+            return
+
+        const currentPath = openFilesModel.get(activeEditorIndex).filePath
+        if (!shell.isUrlTarget(currentPath))
+            return
+
+        if (currentPath !== normalized) {
+            openFilesModel.setProperty(activeEditorIndex, "filePath", normalized)
+            openFilesModel.setProperty(activeEditorIndex, "fileName", normalized)
+            selectedFilePath = normalized
+            selectedFileName = normalized
+            explorerFocusPath = ""
+            pushRecentAddressTarget(normalized)
+        }
+
+        if (addressField && !addressField.activeFocus)
+            addressField.text = normalized
+    }
+
+    function openWebUrlInNewEditorTab(url) {
+        const normalized = shell.normalizeAddressTarget(url)
+        if (!shell.isUrlTarget(normalized))
+            return
+
+        shell.openEditorFile(normalized, normalized, false, "")
+        shell.pushRecentAddressTarget(normalized)
+        shell.setAddressStatus(qsTr("Opened in new tab"), false)
     }
 
     function selectEditorFile(index) {
@@ -119,7 +380,8 @@ Item {
 
         activeEditorIndex = index
         syncActiveEditor()
-        Runtime.rememberOpenedEditorFile(selectedFilePath)
+        if (shell.canPersistPath(selectedFilePath))
+            Runtime.rememberOpenedEditorFile(selectedFilePath)
     }
 
     function closeEditorFile(index) {
@@ -145,7 +407,7 @@ Item {
 
         syncActiveEditor()
 
-        if (selectedFilePath !== closingPath)
+        if (selectedFilePath !== closingPath && shell.canPersistPath(selectedFilePath))
             Runtime.rememberOpenedEditorFile(selectedFilePath)
     }
 
@@ -165,9 +427,53 @@ Item {
     onWidthChanged: clampPaneWidths()
     Component.onCompleted: {
         clampPaneWidths()
+        const loadedHistory = Runtime.addressHistory()
+        recentAddressTargets = loadedHistory ? loadedHistory : []
+        const loadedPinned = Runtime.pinnedAddressHistory()
+        pinnedAddressTargets = loadedPinned ? loadedPinned : []
+
+        const filteredRecent = []
+        for (let i = 0; i < recentAddressTargets.length; ++i) {
+            if (pinnedAddressTargets.indexOf(recentAddressTargets[i]) < 0)
+                filteredRecent.push(recentAddressTargets[i])
+        }
+        recentAddressTargets = filteredRecent
+
         const lastFile = Runtime.lastOpenedEditorFile()
         if (lastFile.length > 0)
             openEditorFile(lastFile, fileNameFromPath(lastFile), false)
+    }
+
+    Timer {
+        id: openAddressTimer
+        interval: 0
+        repeat: false
+        onTriggered: shell.performOpenEditorTarget()
+    }
+
+    Timer {
+        id: clearAddressStatusTimer
+        interval: 2000
+        repeat: false
+        onTriggered: shell.setAddressStatus("", false)
+    }
+
+    Connections {
+        target: Runtime
+
+        function onFileChanged(filePath) {
+            const index = shell.findOpenFileIndex(filePath)
+            if (index < 0)
+                return
+
+            const content = Runtime.readLocalFile(filePath)
+            if (shell.isReadError(content))
+                return
+
+            openFilesModel.setProperty(index, "content", content)
+            if (index === shell.activeEditorIndex)
+                shell.syncActiveEditor()
+        }
     }
 
     Row {
@@ -221,7 +527,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.SplitHCursor
 
-                onPressed: {
+                onPressed: function(mouse) {
                     splitterExplorerEditor.dragging = true
                     splitterExplorerEditor.startX = mouse.x
                     splitterExplorerEditor.startWidth = shell.explorerPaneWidth
@@ -230,7 +536,7 @@ Item {
                 onReleased: splitterExplorerEditor.dragging = false
                 onCanceled: splitterExplorerEditor.dragging = false
 
-                onPositionChanged: {
+                onPositionChanged: function(mouse) {
                     if (!pressed)
                         return
 
@@ -308,6 +614,7 @@ Item {
                                         anchors.right: parent.right
                                         anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
+                                        z: 1
                                         visible: tabMouse.containsMouse || closeHover.containsMouse
                                         color: closeHover.containsMouse ? "#313742" : "transparent"
 
@@ -330,6 +637,7 @@ Item {
                                     MouseArea {
                                         id: tabMouse
                                         anchors.fill: parent
+                                        anchors.rightMargin: 28
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: shell.selectEditorFile(index)
@@ -346,21 +654,222 @@ Item {
                     color: "#161a20"
                     border.color: shell.border
 
-                    Text {
+                    RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideMiddle
-                        text: shell.selectedFilePath.length > 0
-                              ? shell.selectedFilePath
-                              : qsTr("EDITOR")
-                        color: "#b7c0cc"
-                        font.pixelSize: 12
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        anchors.topMargin: 5
+                        anchors.bottomMargin: 5
+                        spacing: 8
+
+                        TextField {
+                            id: addressField
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("Enter file path or URL")
+                            color: "#b7c0cc"
+                            placeholderTextColor: "#6f7b8a"
+                            selectedTextColor: shell.textPrim
+                            selectionColor: shell.accentDim
+                            font.pixelSize: 12
+                            leftPadding: 8
+                            rightPadding: 8
+                            background: Rectangle {
+                                radius: 5
+                                color: "#10151c"
+                                border.width: 1
+                                border.color: addressField.activeFocus ? shell.accent : shell.border
+                            }
+                            onTextEdited: shell.refreshAddressSuggestions()
+                            onActiveFocusChanged: {
+                                if (activeFocus)
+                                    shell.refreshAddressSuggestions()
+                                else
+                                    suggestionsPopup.close()
+                            }
+                            onAccepted: {
+                                if (!shell.selectCurrentSuggestion())
+                                    shell.openEditorTarget(text, true)
+                            }
+                            Keys.onEscapePressed: {
+                                text = shell.selectedFilePath
+                                suggestionsPopup.close()
+                            }
+                            Keys.onPressed: function(event) {
+                                if (!suggestionsPopup.opened)
+                                    return
+
+                                if (event.key === Qt.Key_Down) {
+                                    shell.addressSuggestionIndex = Math.min(
+                                        shell.addressSuggestionIndex + 1,
+                                        addressSuggestionsModel.count - 1)
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Up) {
+                                    shell.addressSuggestionIndex = Math.max(
+                                        shell.addressSuggestionIndex - 1,
+                                        0)
+                                    event.accepted = true
+                                } else if (event.key === Qt.Key_Tab) {
+                                    if (shell.addressSuggestionIndex >= 0
+                                            && shell.addressSuggestionIndex < addressSuggestionsModel.count) {
+                                        addressField.text = addressSuggestionsModel.get(shell.addressSuggestionIndex).value
+                                        suggestionsPopup.close()
+                                        event.accepted = true
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 120
+                            text: shell.addressStatusText
+                            color: shell.addressStatusIsError ? shell.danger : shell.textSec
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Rectangle {
+                            Layout.preferredWidth: 50
+                            Layout.preferredHeight: 24
+                            radius: 5
+                            color: shell.addressBusy ? "#2d3340" : "#222a34"
+                            border.width: 1
+                            border.color: shell.addressBusy ? shell.accent : shell.border
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: shell.addressBusy ? "..." : qsTr("Go")
+                                color: shell.textPrim
+                                font.pixelSize: 11
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: !shell.addressBusy
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: shell.openEditorTarget(addressField.text, true)
+                            }
+                        }
+                    }
+
+                    Popup {
+                        id: suggestionsPopup
+                        x: 10
+                        y: parent.height
+                        width: parent.width - 70
+                        height: Math.min(260, suggestionsList.contentHeight + clearHistoryRow.height + 12)
+                        padding: 4
+                        modal: false
+                        focus: false
+                        closePolicy: Popup.NoAutoClose
+                        visible: opened
+
+                        background: Rectangle {
+                            color: "#11161d"
+                            border.color: shell.border
+                            radius: 6
+                        }
+
+                        contentItem: Column {
+                            spacing: 4
+
+                            ListView {
+                                id: suggestionsList
+                                width: parent.width
+                                height: Math.min(220, contentHeight)
+                                clip: true
+                                model: addressSuggestionsModel
+                                boundsBehavior: Flickable.StopAtBounds
+
+                                delegate: Rectangle {
+                                    required property int index
+                                    required property string value
+                                    required property bool pinned
+
+                                    width: suggestionsList.width
+                                    height: 28
+                                    radius: 4
+                                    color: index === shell.addressSuggestionIndex ? "#253042" : "transparent"
+
+                                    Rectangle {
+                                        width: 18
+                                        height: 18
+                                        radius: 9
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: pinMouse.containsMouse ? "#2b3340" : "transparent"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: pinned ? "★" : "☆"
+                                            color: pinned ? "#facc15" : shell.textSec
+                                            font.pixelSize: 11
+                                        }
+
+                                        MouseArea {
+                                            id: pinMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: shell.togglePinnedAddressTarget(value)
+                                        }
+                                    }
+
+                                    Text {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 30
+                                        anchors.rightMargin: 8
+                                        verticalAlignment: Text.AlignVCenter
+                                        text: value
+                                        color: shell.textPrim
+                                        elide: Text.ElideMiddle
+                                        font.pixelSize: 11
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onEntered: shell.addressSuggestionIndex = index
+                                        onClicked: {
+                                            addressField.text = value
+                                            suggestionsPopup.close()
+                                            shell.openEditorTarget(value, true)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                id: clearHistoryRow
+                                width: parent.width
+                                height: 28
+                                radius: 4
+                                color: clearMouse.containsMouse ? "#2a1a1a" : "transparent"
+                                visible: shell.recentAddressTargets.length > 0 || shell.pinnedAddressTargets.length > 0
+
+                                Text {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: qsTr("Clear recent history")
+                                    color: "#fca5a5"
+                                    font.pixelSize: 11
+                                }
+
+                                MouseArea {
+                                    id: clearMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: shell.clearRecentAddressTargets()
+                                }
+                            }
+                        }
                     }
                 }
 
                 CodeEditor {
+                    id: editorView
                     width: parent.width
                     height: parent.height - 74
                     fileName: shell.selectedFileName
@@ -369,6 +878,8 @@ Item {
                     backgroundColor: "#0f1115"
                     gutterColor: "#0c0f14"
                     borderColor: shell.border
+                    onWebUrlChanged: (url) => shell.handleEditorWebUrlChanged(url)
+                    onWebNewTabRequested: (url) => shell.openWebUrlInNewEditorTab(url)
                 }
             }
         }
@@ -407,7 +918,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.SplitHCursor
 
-                onPressed: {
+                onPressed: function(mouse) {
                     splitterEditorAgent.dragging = true
                     splitterEditorAgent.startX = mouse.x
                     splitterEditorAgent.startWidth = shell.editorPaneWidth
@@ -416,7 +927,7 @@ Item {
                 onReleased: splitterEditorAgent.dragging = false
                 onCanceled: splitterEditorAgent.dragging = false
 
-                onPositionChanged: {
+                onPositionChanged: function(mouse) {
                     if (!pressed)
                         return
 
