@@ -52,7 +52,7 @@ Rectangle {
         if (!webViewObject) {
             try {
                 webViewObject = Qt.createQmlObject(
-                    "import QtQuick; import QtWebEngine; import QtWebChannel; WebEngineView { anchors.fill: parent; anchors.topMargin: 34; backgroundColor: '#0f1115'; settings.forceDarkMode: true; onUrlChanged: editor.onDynamicUrlChanged(url.toString()); onNewWindowRequested: function(request) { editor.onDynamicNewWindowRequested(request.requestedUrl.toString()) } }",
+                    "import QtQuick; import QtWebEngine; import QtWebChannel; WebEngineView { anchors.fill: parent; anchors.topMargin: 34; settings.forceDarkMode: true; onUrlChanged: editor.onDynamicUrlChanged(url.toString()); onNewWindowRequested: function(request) { editor.onDynamicNewWindowRequested(request.requestedUrl.toString()) } }",
                     webContainer,
                     "dynamicWebView")
                 webViewError = ""
@@ -126,6 +126,12 @@ Rectangle {
 
     onIsWebTargetChanged: ensureWebView()
     onFilePathChanged: ensureWebView()
+    onContentChanged: {
+        if (codeText && codeText.text !== content)
+            codeText.text = content
+        if (highlightLayer)
+            highlightLayer.text = highlightedHtml()
+    }
     Component.onCompleted: ensureWebView()
 
     Timer {
@@ -359,7 +365,7 @@ Rectangle {
             id: codeText
             x: editor.gutterWidth + 14
             y: 12
-            text: editor.content
+            text: ""
             textFormat: TextEdit.PlainText
             readOnly: false
             selectByMouse: true
@@ -367,7 +373,6 @@ Rectangle {
             wrapMode: TextEdit.NoWrap
             cursorVisible: true
             color: "transparent"
-            backgroundColor: "transparent"
             selectionColor: "#4a5c7a"
             font { family: "Menlo"; pixelSize: editor.fontSize }
             renderType: Text.NativeRendering
