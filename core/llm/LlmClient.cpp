@@ -65,6 +65,7 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
                           .toJson(QJsonDocument::Compact);
 
     auto *reply = m_nam->post(buildRequest(), body);
+    m_activeReply = reply;
     // Shared flag so the timer and finished handler don't both emit.
     auto emitted = std::make_shared<bool>(false);
 
@@ -85,7 +86,13 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
 
     connect(reply, &QNetworkReply::finished, this,
             [this, reply, messages, tools, emitted]() {
-        if (*emitted) { reply->deleteLater(); return; }
+        if (m_activeReply == reply)
+            m_activeReply = nullptr;
+        const bool ignored = m_ignoredReplies.remove(reply) > 0;
+        if (*emitted || ignored || reply->error() == QNetworkReply::OperationCanceledError) {
+            reply->deleteLater();
+            return;
+        }
         reply->deleteLater();
         *emitted = true;
 

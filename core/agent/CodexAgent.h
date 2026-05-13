@@ -84,6 +84,7 @@ private:
     QString         m_currentFilePath;
     QString         m_currentFileContent;
     bool            m_busy{false};
+    bool            m_turnCancelled{false};  // Flag to distinguish user cancellation from errors
     QPointer<WorkspaceContext> m_workspaceContext;
 };
 

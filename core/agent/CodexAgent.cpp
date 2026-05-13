@@ -122,6 +122,7 @@ void CodexAgent::cancelTurn()
 {
     if (!m_busy)
         return;
+    m_turnCancelled = true;  // Mark as user-initiated cancellation
     if (m_client)
         m_client->abort();
     // Reset turn state
@@ -277,6 +278,13 @@ void CodexAgent::submitPrompt(const QString &text, const QVariantMap &options)
         });
         connect(m_client, &LlmClient::errorOccurred,
                 this, [this](const QString &error) {
+            if (m_turnCancelled) {
+                // Suppress error emission if turn was user-cancelled
+                m_busy = false;
+                setStatus(Status::Idle);
+                m_turnCancelled = false;
+                return;
+            }
             m_busy = false;
             setStatus(Status::Error);
             emit errorOccurred(error);
