@@ -15,13 +15,13 @@ Item {
             Layout.fillWidth: true
             Text {
                 text: qsTr("Agents")
-                font { family: "Sans Serif"; pixelSize: 28; weight: Font.Bold }
+                font { pixelSize: 28; weight: Font.Bold }
                 color: page.palette.textPrim
                 Layout.fillWidth: true
             }
             Text {
                 text: Runtime.agentCount + qsTr(" registered")
-                font { family: "Sans Serif"; pixelSize: 13 }
+                font { pixelSize: 13 }
                 color: page.palette.textSec
             }
         }
@@ -51,7 +51,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             text: qsTr("No agents registered yet.\nCreate agents via the plugins system or API.")
             horizontalAlignment: Text.AlignHCenter
-            font { family: "Sans Serif"; pixelSize: 14 }
+            font { pixelSize: 14 }
             color: page.palette.textSec
             lineHeight: 1.6
         }

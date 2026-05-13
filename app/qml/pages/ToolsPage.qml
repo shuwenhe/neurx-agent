@@ -12,13 +12,13 @@ Item {
 
         Text {
             text: qsTr("Tools")
-            font { family: "Sans Serif"; pixelSize: 28; weight: Font.Bold }
+            font { pixelSize: 28; weight: Font.Bold }
             color: page.palette.textPrim
         }
 
         Text {
             text: qsTr("Tools registered in the ToolRegistry are listed here.\nAgents use these tools to interact with the world.")
-            font { family: "Sans Serif"; pixelSize: 14 }
+            font { pixelSize: 14 }
             color: page.palette.textSec
             lineHeight: 1.6
             Layout.fillWidth: true
@@ -33,7 +33,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 text: qsTr("Tool registry view — coming soon")
-                font { family: "Sans Serif"; pixelSize: 14 }
+                font { pixelSize: 14 }
                 color: page.palette.textSec
             }
         }

@@ -12,7 +12,7 @@ Item {
 
         Text {
             text: qsTr("Dashboard")
-            font { family: "Sans Serif"; pixelSize: 28; weight: Font.Bold }
+            font { pixelSize: 28; weight: Font.Bold }
             color: page.palette.textPrim
         }
 
@@ -35,7 +35,7 @@ Item {
         // Log console
         Text {
             text: qsTr("Live Log")
-            font { family: "Sans Serif"; pixelSize: 16; weight: Font.Medium }
+            font { pixelSize: 16; weight: Font.Medium }
             color: page.palette.textPrim
         }
 
@@ -61,12 +61,12 @@ Item {
 
                     Text {
                         text: model.time
-                        font { family: "monospace"; pixelSize: 11 }
+                        font { family: "Menlo"; pixelSize: 11 }
                         color: "#666"
                     }
                     Text {
                         text: model.level.toUpperCase()
-                        font { family: "monospace"; pixelSize: 11 }
+                        font { family: "Menlo"; pixelSize: 11 }
                         color: model.level === "error"   ? "#ef4444"
                              : model.level === "warning" ? "#f59e0b"
                              : model.level === "info"    ? "#6c63ff"
@@ -75,12 +75,12 @@ Item {
                     }
                     Text {
                         text: "[" + model.tag + "]"
-                        font { family: "monospace"; pixelSize: 11 }
+                        font { family: "Menlo"; pixelSize: 11 }
                         color: "#888"
                     }
                     Text {
                         text: model.message
-                        font { family: "monospace"; pixelSize: 11 }
+                        font { family: "Menlo"; pixelSize: 11 }
                         color: "#ccc"
                         Layout.fillWidth: true
                         elide: Text.ElideRight
@@ -106,13 +106,13 @@ Item {
             spacing: 6
             Text {
                 text: parent.parent.value.toString()
-                font { family: "Sans Serif"; pixelSize: 32; weight: Font.Bold }
+                font { pixelSize: 32; weight: Font.Bold }
                 color: parent.parent.accent
                 anchors.horizontalCenter: parent.horizontalCenter
             }
             Text {
                 text: parent.parent.label
-                font { family: "Sans Serif"; pixelSize: 13 }
+                font { pixelSize: 13 }
                 color: "#9a9a9a"
                 anchors.horizontalCenter: parent.horizontalCenter
             }

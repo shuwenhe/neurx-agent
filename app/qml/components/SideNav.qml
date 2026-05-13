@@ -29,7 +29,7 @@ Rectangle {
             Text {
                 anchors.centerIn: parent
                 text: "NeurX"
-                font { family: "Sans Serif"; pixelSize: 22; weight: Font.Bold }
+                font { pixelSize: 22; weight: Font.Bold }
                 color: "#6c63ff"
             }
         }
@@ -66,7 +66,7 @@ Rectangle {
             Text {
                 text: Runtime.running ? qsTr("Runtime active") : qsTr("Runtime stopped")
                 color: "#9a9a9a"
-                font { family: "Sans Serif"; pixelSize: 12 }
+                font { pixelSize: 12 }
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
@@ -106,7 +106,7 @@ Rectangle {
             }
             Text {
                 text: item.label
-                font { family: "Sans Serif"; pixelSize: 14 }
+                font { pixelSize: 14 }
                 color: item.active ? "#f0f0f0" : "#9a9a9a"
                 Layout.fillWidth: true
             }
