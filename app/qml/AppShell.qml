@@ -23,6 +23,7 @@ Item {
     property var recentAddressTargets: []
     property var pinnedAddressTargets: []
     property int addressSuggestionIndex: -1
+    property int tabContextIndex: -1
 
     readonly property real splitterWidth: 6
     readonly property real minExplorerPaneWidth: 220
@@ -416,6 +417,65 @@ Item {
             closeEditorFile(activeEditorIndex)
     }
 
+    function updateActiveEditorContent(content) {
+        if (activeEditorIndex < 0 || activeEditorIndex >= openFilesModel.count)
+            return
+
+        openFilesModel.setProperty(activeEditorIndex, "content", content)
+        selectedFileContent = content
+    }
+
+    function closeOtherEditorFiles(index) {
+        if (index < 0 || index >= openFilesModel.count)
+            return
+
+        const activePath = openFilesModel.get(index).filePath
+        const activeName = openFilesModel.get(index).fileName
+        const activeContent = openFilesModel.get(index).content
+        openFilesModel.clear()
+        openFilesModel.append({
+            filePath: activePath,
+            fileName: activeName,
+            content: activeContent
+        })
+        activeEditorIndex = 0
+        syncActiveEditor()
+
+        if (shell.canPersistPath(selectedFilePath))
+            Runtime.rememberOpenedEditorFile(selectedFilePath)
+    }
+
+    function closeEditorFilesToRight(index) {
+        if (index < 0 || index >= openFilesModel.count)
+            return
+
+        for (let i = openFilesModel.count - 1; i > index; --i)
+            openFilesModel.remove(i)
+
+        activeEditorIndex = Math.min(activeEditorIndex, openFilesModel.count - 1)
+        syncActiveEditor()
+
+        if (shell.canPersistPath(selectedFilePath))
+            Runtime.rememberOpenedEditorFile(selectedFilePath)
+    }
+
+    function closeAllEditorFiles() {
+        openFilesModel.clear()
+        activeEditorIndex = -1
+        syncActiveEditor()
+    }
+
+    function openEditorTabContextMenu(index, tabItem, mouse) {
+        if (index < 0 || index >= openFilesModel.count)
+            return
+
+        tabContextIndex = index
+        const point = tabItem.mapToItem(editorTabMenu.parent, mouse.x, mouse.y)
+        editorTabMenu.x = point.x
+        editorTabMenu.y = point.y
+        editorTabMenu.open()
+    }
+
     function ensureNewestTabVisible() {
         Qt.callLater(function() {
             if (!tabsFlick)
@@ -568,6 +628,38 @@ Item {
                     color: "#12161d"
                     border.color: shell.border
 
+                    Menu {
+                        id: editorTabMenu
+                        modal: true
+
+                        MenuItem {
+                            text: qsTr("Close")
+                            enabled: shell.tabContextIndex >= 0
+                            onTriggered: shell.closeEditorFile(shell.tabContextIndex)
+                        }
+
+                        MenuItem {
+                            text: qsTr("Close Others")
+                            enabled: shell.tabContextIndex >= 0 && openFilesModel.count > 1
+                            onTriggered: shell.closeOtherEditorFiles(shell.tabContextIndex)
+                        }
+
+                        MenuItem {
+                            text: qsTr("Close to the Right")
+                            enabled: shell.tabContextIndex >= 0
+                                && shell.tabContextIndex < openFilesModel.count - 1
+                            onTriggered: shell.closeEditorFilesToRight(shell.tabContextIndex)
+                        }
+
+                        MenuSeparator {}
+
+                        MenuItem {
+                            text: qsTr("Close All")
+                            enabled: openFilesModel.count > 0
+                            onTriggered: shell.closeAllEditorFiles()
+                        }
+                    }
+
                     Flickable {
                         id: tabsFlick
                         anchors.fill: parent
@@ -638,9 +730,16 @@ Item {
                                         id: tabMouse
                                         anchors.fill: parent
                                         anchors.rightMargin: 28
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: shell.selectEditorFile(index)
+                                        onClicked: function(mouse) {
+                                            if (mouse.button === Qt.RightButton) {
+                                                shell.openEditorTabContextMenu(index, parent, mouse)
+                                            } else {
+                                                shell.selectEditorFile(index)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -880,6 +979,7 @@ Item {
                     borderColor: shell.border
                     onWebUrlChanged: (url) => shell.handleEditorWebUrlChanged(url)
                     onWebNewTabRequested: (url) => shell.openWebUrlInNewEditorTab(url)
+                    onContentEdited: (text) => shell.updateActiveEditorContent(text)
                 }
             }
         }

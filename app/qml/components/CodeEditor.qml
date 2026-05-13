@@ -8,6 +8,7 @@ Rectangle {
 
     signal webUrlChanged(string url)
     signal webNewTabRequested(string url)
+    signal contentEdited(string text)
 
     property string fileName: ""
     property string filePath: ""
@@ -379,7 +380,8 @@ Rectangle {
             z: 2
             
             onTextChanged: {
-                editor.content = text
+                if (text !== editor.content)
+                    editor.contentEdited(text)
             }
         }
 
