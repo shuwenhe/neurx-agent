@@ -338,6 +338,23 @@ Rectangle {
             z: 2
         }
 
+        // Highlighted display layer (below)
+        TextEdit {
+            id: highlightLayer
+            x: editor.gutterWidth + 14
+            y: 12
+            text: editor.highlightedHtml()
+            textFormat: TextEdit.RichText
+            readOnly: true
+            selectByMouse: false
+            wrapMode: TextEdit.NoWrap
+            cursorVisible: false
+            font { family: "Menlo"; pixelSize: editor.fontSize }
+            renderType: Text.NativeRendering
+            z: 1
+        }
+
+        // Editable layer (above, transparent)
         TextEdit {
             id: codeText
             x: editor.gutterWidth + 14
@@ -349,9 +366,12 @@ Rectangle {
             persistentSelection: true
             wrapMode: TextEdit.NoWrap
             cursorVisible: true
-            color: editor.textColor
+            color: "transparent"
+            backgroundColor: "transparent"
+            selectionColor: "#4a5c7a"
             font { family: "Menlo"; pixelSize: editor.fontSize }
             renderType: Text.NativeRendering
+            z: 2
             
             onTextChanged: {
                 editor.content = text
@@ -368,6 +388,14 @@ Rectangle {
                 editorContextMenu.x = mouse.x + codeText.x
                 editorContextMenu.y = mouse.y + codeText.y
                 editorContextMenu.open()
+            }
+        }
+
+        // Sync highlight layer when content changes
+        Connections {
+            target: codeText
+            function onTextChanged() {
+                highlightLayer.text = editor.highlightedHtml()
             }
         }
 
