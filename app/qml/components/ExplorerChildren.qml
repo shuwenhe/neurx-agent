@@ -14,6 +14,25 @@ Column {
     property Flickable scrollTarget: null
     signal fileActivated(string filePath, string fileName)
 
+    Connections {
+        target: Runtime
+
+        function onFileChanged(filePath) {
+            if (!filePath || children.parentPath.length === 0)
+                return
+
+            const normalizedParent = children.parentPath.endsWith("/")
+                ? children.parentPath
+                : children.parentPath + "/"
+            const normalizedChanged = String(filePath)
+
+            if (normalizedChanged === children.parentPath
+                    || normalizedChanged.indexOf(normalizedParent) === 0) {
+                folderModel.refresh()
+            }
+        }
+    }
+
     FolderListModel {
         id: folderModel
         folder: children.parentPath.length > 0 ? "file://" + children.parentPath : ""
