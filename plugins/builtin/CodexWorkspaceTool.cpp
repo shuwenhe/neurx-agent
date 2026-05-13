@@ -1,6 +1,7 @@
 #include "CodexWorkspaceTool.h"
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
@@ -167,6 +168,105 @@ QVariantMap runRgSearch(const QString &root,
         {QStringLiteral("truncated"), truncated},
         {QStringLiteral("backend"), QStringLiteral("rg")}};
 }
+
+QVariantMap runFileNameSearch(const QString &root,
+                              const QString &searchPath,
+                              const QString &query,
+                              int maxCount,
+                              int timeoutMs)
+{
+    const QString queryLower = query.toLower();
+    if (queryLower.trimmed().isEmpty()) {
+        return {{QStringLiteral("results"), QString()},
+                {QStringLiteral("exitCode"), 1},
+                {QStringLiteral("truncated"), false},
+                {QStringLiteral("backend"), QStringLiteral("rg-files")}};
+    }
+
+    auto formatMatches = [&](const QStringList &candidates,
+                             const QString &backend,
+                             bool sourceTruncated) -> QVariantMap {
+        QStringList matches;
+        matches.reserve(maxCount);
+        const QString rootPrefix = root + QLatin1Char('/');
+
+        for (const QString &candidateRaw : candidates) {
+            const QString candidate = candidateRaw.trimmed();
+            if (candidate.isEmpty())
+                continue;
+
+            const QString fullPath = QDir::isAbsolutePath(candidate)
+                ? QDir::cleanPath(candidate)
+                : QDir(root).absoluteFilePath(candidate);
+            const QString relPath = fullPath.startsWith(rootPrefix)
+                ? fullPath.mid(rootPrefix.size())
+                : QFileInfo(fullPath).fileName();
+
+            if (!fullPath.toLower().contains(queryLower)
+                && !relPath.toLower().contains(queryLower)) {
+                continue;
+            }
+
+            matches.append(relPath);
+            if (matches.size() >= maxCount)
+                break;
+        }
+
+        const QString output = matches.join(QLatin1Char('\n'));
+        const QByteArray outBytes = output.toUtf8();
+        bool truncated = sourceTruncated || matches.size() >= maxCount;
+
+        QByteArray clipped = outBytes;
+        if (clipped.size() > kMaxSearchBytes) {
+            clipped.truncate(kMaxSearchBytes);
+            truncated = true;
+        }
+
+        return {{QStringLiteral("results"), QString::fromUtf8(clipped)},
+                {QStringLiteral("exitCode"), matches.isEmpty() ? 1 : 0},
+                {QStringLiteral("truncated"), truncated},
+                {QStringLiteral("backend"), backend}};
+    };
+
+    QProcess process;
+    process.setWorkingDirectory(root);
+    process.start(QStringLiteral("rg"), {
+        QStringLiteral("--files"),
+        searchPath
+    });
+
+    if (process.waitForStarted(1000)) {
+        if (!process.waitForFinished(timeoutMs)) {
+            process.kill();
+            process.waitForFinished(500);
+            return {{QStringLiteral("error"), QStringLiteral("file name search timed out")}};
+        }
+
+        const QStringList lines = QString::fromUtf8(process.readAllStandardOutput())
+                                      .split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+        return formatMatches(lines, QStringLiteral("rg-files"), false);
+    }
+
+    // Fallback when ripgrep is unavailable in runtime env.
+    QStringList lines;
+    QDirIterator it(searchPath,
+                    QDir::Files | QDir::NoSymLinks,
+                    QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        const QString next = it.next();
+        if (next.contains(QStringLiteral("/.git/"))
+            || next.contains(QStringLiteral("/build/"))
+            || next.contains(QStringLiteral("/node_modules/"))
+            || next.contains(QStringLiteral("/.cache/"))) {
+            continue;
+        }
+        lines.append(next);
+        if (lines.size() > maxCount * 20)
+            break;
+    }
+
+    return formatMatches(lines, QStringLiteral("qdiriterator"), lines.size() > maxCount * 20);
+}
 }
 
 CodexReadFileTool::CodexReadFileTool()
@@ -236,6 +336,20 @@ QVariantMap CodexSearchWorkspaceTool::execute(const QVariantMap &params)
                                      searchPath,
                                      80,
                                      5000);
+    const bool noContentHit = result.value(QStringLiteral("results")).toString().trimmed().isEmpty();
+    if (noContentHit) {
+        QVariantMap fileResult = runFileNameSearch(root,
+                                                   searchPath,
+                                                   query,
+                                                   80,
+                                                   5000);
+        if (fileResult.value(QStringLiteral("exitCode")).toInt() == 0) {
+            fileResult.insert(QStringLiteral("query"), query);
+            fileResult.insert(QStringLiteral("kind"), QStringLiteral("filename"));
+            return fileResult;
+        }
+    }
+
     result.insert(QStringLiteral("query"), query);
     return result;
 }
