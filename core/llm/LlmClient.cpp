@@ -149,8 +149,12 @@ void LlmClient::chat(const QList<LlmMessage> &messages,
 
 void LlmClient::abort()
 {
-    if (m_activeReply && m_activeReply->isRunning())
-        m_activeReply->abort();
+    if (m_activeReply) {
+        // Mark for ignored reads before aborting to prevent Qt warnings
+        m_ignoredReplies.insert(m_activeReply);
+        if (m_activeReply->isRunning())
+            m_activeReply->abort();
+    }
 }
 
 void LlmClient::chatStream(const QList<LlmMessage> &messages,
@@ -166,7 +170,8 @@ void LlmClient::chatStream(const QList<LlmMessage> &messages,
     auto aborted = std::make_shared<bool>(false);
 
     connect(reply, &QNetworkReply::readyRead, this, [this, reply, accumulated]() {
-        if (!reply->isOpen())
+        // Skip reads on replies that are being aborted
+        if (m_ignoredReplies.contains(reply))
             return;
 
         const auto lines = reply->readAll().split('\n');
@@ -186,6 +191,7 @@ void LlmClient::chatStream(const QList<LlmMessage> &messages,
     connect(reply, &QNetworkReply::finished, this, [this, reply, accumulated, aborted]() {
         if (m_activeReply == reply)
             m_activeReply = nullptr;
+        m_ignoredReplies.remove(reply);
         reply->deleteLater();
         if (reply->error() == QNetworkReply::OperationCanceledError || *aborted) {
             emit streamFinished(*accumulated); // emit what we have so far

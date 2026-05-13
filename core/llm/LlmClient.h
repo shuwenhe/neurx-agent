@@ -6,6 +6,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPointer>
+#include <QSet>
 #include <functional>
 
 namespace neurx {
@@ -65,6 +66,7 @@ private:
     LlmConfig              m_config;
     QNetworkAccessManager *m_nam;
     QPointer<QNetworkReply> m_activeReply;
+    QSet<QNetworkReply*>   m_ignoredReplies;  // Replies being aborted; don't read from them
 };
 
 } // namespace neurx
